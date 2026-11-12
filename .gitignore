@@ -1,0 +1,6 @@
+# M0 凭据与配对状态（含密钥，绝不入库）
+.m0-creds.json
+.m0-state.json
+
+# Go
+*.test
