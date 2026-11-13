@@ -111,6 +111,23 @@ func (a *app) codieClear() {
 	})
 }
 
+// codieClearToasted 清理设备歌曲并把结果以 toast 告知（供播放栏按钮）。
+func (a *app) codieClearToasted() {
+	c := a.codieClient()
+	if c == nil {
+		a.post(func() { a.toast = "未配对 codie 设备" })
+		return
+	}
+	n, err := c.ClearCardUploads()
+	a.post(func() {
+		if err != nil {
+			a.toast = fmt.Sprintf("清理中断（已删 %d 个）：%v", n, err)
+		} else {
+			a.toast = fmt.Sprintf("已清理 codie 上 %d 首歌曲", n)
+		}
+	})
+}
+
 // codieForget drops the pairing.
 func (a *app) codieForget() {
 	a.settings.Codie = nil
