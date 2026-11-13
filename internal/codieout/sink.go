@@ -66,10 +66,10 @@ func (s *Sink) RemotePlay(ids []string, start int, position int64) error {
 	}
 	storage, err := s.client.MusicStorage()
 	if err != nil {
-		return err
+		return err // already friendly: offline / credential hints
 	}
 	if !storage.IsLoaded {
-		return fmt.Errorf("codie: the TF card isn't ready")
+		return fmt.Errorf("设备的 TF 卡未就绪——请插入 TF 卡后重试")
 	}
 	card, err := s.client.UploadFile(local)
 	if err != nil {

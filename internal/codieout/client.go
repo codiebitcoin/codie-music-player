@@ -128,7 +128,7 @@ func (c *Client) Call(method, path string, body []byte, mode, contentType string
 	req.Header.Set("X-Local-Session-Id", cr.SessionID)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("连不上 codie 设备（%v）——检查设备是否在线、地址是否正确", err)
 	}
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	resp.Body.Close()
@@ -138,9 +138,38 @@ func (c *Client) Call(method, path string, body []byte, mode, contentType string
 			Message string `json:"message"`
 		}
 		json.Unmarshal(raw, &e)
-		return nil, &APIError{Status: resp.StatusCode, Code: e.Code, Message: first(e.Message, trunc(raw, 200))}
+		return nil, friendly(codeErr(resp.StatusCode, e.Code, first(e.Message, trunc(raw, 200))))
 	}
 	return raw, nil
+}
+
+// codeErr builds the raw APIError.
+func codeErr(status int, code, msg string) error {
+	return &APIError{Status: status, Code: code, Message: msg}
+}
+
+// friendly turns device-side failures into actionable Chinese hints; unknown
+// errors keep their original text.
+func friendly(err error) error {
+	ae, ok := err.(*APIError)
+	if !ok {
+		return err
+	}
+	switch ae.Code {
+	case "MODE_INACTIVE", "MUSIC_MODE_INACTIVE":
+		return fmt.Errorf("设备上没有打开音乐页面——请先在 codie 设备上打开音乐 App，再点播放")
+	case "TF_CARD_NOT_READY", "MUSIC_TF_NOT_READY":
+		return fmt.Errorf("设备的 TF 卡未就绪——请插入 TF 卡后重试")
+	case "MEDIA_UPLOAD_BUSY":
+		return fmt.Errorf("设备正在处理上一个上传，稍等几秒再试")
+	case "MEDIA_STORAGE_FULL", "BODY_TOO_LARGE":
+		return fmt.Errorf("设备存储空间不足，清理 TF 卡后重试")
+	case "INVALID_SIGNATURE", "LOCAL_SESSION_EXPIRED", "LOCAL_SECRET_MISMATCH", "LOCAL_USER_MISMATCH":
+		return fmt.Errorf("设备凭据已失效——到 设置 → Codie 重新配对")
+	case "UNAUTHORIZED":
+		return fmt.Errorf("设备拒绝了本次请求——可能刚重启，稍后重试或重新配对")
+	}
+	return err
 }
 
 func (c *Client) GetJSON(path string, out any) error { return c.reqJSON("GET", path, nil, out) }
@@ -168,7 +197,7 @@ func (c *Client) reqJSON(method, path string, body []byte, out any) error {
 		return fmt.Errorf("codie: bad envelope: %s", trunc(raw, 200))
 	}
 	if !env.Success {
-		return &APIError{Status: 200, Code: env.Code, Message: env.Message}
+		return friendly(&APIError{Status: 200, Code: env.Code, Message: env.Message})
 	}
 	if out != nil && len(env.Data) > 0 {
 		return json.Unmarshal(env.Data, out)
