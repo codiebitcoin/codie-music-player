@@ -1,6 +1,8 @@
 package app
 
 import (
+	"io/fs"
+
 	"log"
 	"os"
 	"path/filepath"
@@ -321,7 +323,7 @@ func (a *app) closeSources() {
 }
 
 // Run runs the app until it quits.
-func Run() error {
+func Run(bundledPlugins fs.FS) error {
 	// Opening the app again shows the running one's window: Linux and
 	// Windows would start another, with a second tray icon. Asked before
 	// anything else, so the second one touches no data on its way out.
@@ -340,6 +342,7 @@ func Run() error {
 		a.settings = loadSettings()
 		a.settings.applyAppearance()
 		i18n.SetLanguage(i18n.Resolve(a.settings.Language, systemLanguages()))
+		ensureBundledPlugins(bundledPlugins)
 		a.npPane = a.lyricsPaneChosen()
 		a.makeSources()
 		// Before the window: on Windows it lays out its content as it is
