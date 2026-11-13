@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	addr        = "http://192.168.1.208:8081"
+	addr        = "http://192.168.1.160:8081"
 	stateFile   = ".m0-state.json"
 	credsFile   = ".m0-creds.json"
 	uploadDir   = "codie-music-play"
@@ -73,6 +73,14 @@ func main() {
 		return
 	case "library":
 		err = doLibrary()
+	case "playq":
+		// PLAY + queue 构造（复刻设备 AI 的 playMusicResource 流程）
+		// usage: m0 playq <local:/storage/.../x.m4a> [more ids...]
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: m0 playq <track_id...>")
+			os.Exit(2)
+		}
+		err = doPlayQueue(os.Args[2:])
 	case "upload":
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "usage: m0 upload <file>")
@@ -87,6 +95,22 @@ func main() {
 		err = doControl("SELECT_TRACK", map[string]any{"track_id": os.Args[2]})
 	case "playback":
 		_, err = signedJSON("GET", musicPrefix+"/playback", nil, "")
+		return
+	case "qs":
+		err = doControl("QUERY_STATE", map[string]any{"source": "LOCAL_TF"})
+	case "get":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: m0 get <path>")
+			os.Exit(2)
+		}
+		_, err = signedJSON("GET", os.Args[2], nil, "")
+		return
+	case "post":
+		if len(os.Args) < 4 {
+			fmt.Fprintln(os.Stderr, "usage: m0 post <path> <json>")
+			os.Exit(2)
+		}
+		_, err = signedJSON("POST", os.Args[2], []byte(os.Args[3]), "application/json")
 		return
 	case "stop":
 		err = doControl("STOP", nil)
@@ -247,7 +271,7 @@ func doUpload(file string) error {
 	if err != nil {
 		return err
 	}
-	// 手工构造 multipart：files[] + directory + conflict_policy
+	// 手工构造 multipart：files（后端读 form.File["files"]，注意不带 []）+ directory + conflict_policy
 	var buf bytes.Buffer
 	boundary := "m0" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	mw := func(name string) {
@@ -257,7 +281,7 @@ func doUpload(file string) error {
 	buf.WriteString(uploadDir + "\r\n")
 	mw("conflict_policy")
 	buf.WriteString("overwrite\r\n")
-	buf.WriteString("--" + boundary + "\r\nContent-Disposition: form-data; name=\"files[]\"; filename=\"" + filepath.Base(file) + "\"\r\nContent-Type: application/octet-stream\r\n\r\n")
+	buf.WriteString("--" + boundary + "\r\nContent-Disposition: form-data; name=\"files\"; filename=\"" + filepath.Base(file) + "\"\r\nContent-Type: application/octet-stream\r\n\r\n")
 	buf.Write(data)
 	buf.WriteString("\r\n--" + boundary + "--\r\n")
 
@@ -284,6 +308,86 @@ func doControl(action string, extra map[string]any) error {
 		return err
 	}
 	fmt.Printf("HTTP %d\n%s\n", resp.StatusCode, trunc2k(raw))
+	return nil
+}
+
+// doPlayQueue 走 HTTP 契约的 PLAY + 内联 queue 播放：
+// 先 GET /music/storage 拿 storage_root，再把曲目作为队列条目直接下发。
+func doPlayQueue(trackIDs []string) error {
+	c, err := loadCreds()
+	if err != nil {
+		return err
+	}
+	resp, raw, err := signedCall(c, "GET", musicPrefix+"/storage", nil, "")
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("storage HTTP %d: %s", resp.StatusCode, trunc(raw))
+	}
+	var st struct {
+		Data struct {
+			IsLoaded  bool   `json:"is_loaded"`
+			RootPath  string `json:"root_path"`
+			RootFiles []struct {
+				Name string `json:"name"`
+				Path string `json:"path"`
+			} `json:"music_files"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &st); err != nil || !st.Data.IsLoaded {
+		return fmt.Errorf("TF 卡未就绪: %s", trunc(raw))
+	}
+	available := map[string]bool{}
+	byName := map[string]string{} // 文件名 -> local:/完整路径
+	for _, f := range st.Data.RootFiles {
+		available["local:"+f.Path] = true
+		byName[f.Name] = "local:" + f.Path
+	}
+	entries := make([]map[string]any, 0, len(trackIDs))
+	for _, id := range trackIDs {
+		if !strings.HasPrefix(id, "local:/") { // 允许只传文件名
+			if p, ok := byName[id]; ok {
+				id = p
+			} else {
+				return fmt.Errorf("曲目不在 TF 卡上: %s", id)
+			}
+		}
+		if !available[id] {
+			return fmt.Errorf("曲目不在 TF 卡上: %s", id)
+		}
+		entries = append(entries, map[string]any{"id": randHex(16), "track_id": id})
+	}
+	first := entries[0]["id"].(string)
+	rev := 0 // 无现存队列时 revision 为 0（与前端空队列默认一致）
+	payload := map[string]any{
+		"action": "PLAY", "source": "LOCAL_TF",
+		"request_id":            fmt.Sprintf("m0-%d", time.Now().UnixNano()),
+		"expected_queue_revision": rev,
+		"queue_entry_id":          first,
+		// 字段名与设备自带音乐页面完全一致（snake_case）
+		"queue": map[string]any{
+			"storage_root": st.Data.RootPath, "title": "codie-music-play", "auto_advance": true, "revision": rev,
+			"entries": entries, "current_entry_id": first,
+		},
+	}
+	body, _ := json.Marshal(payload)
+	resp, raw, err = signedCall(c, "POST", musicPrefix+"/control", body, "application/json")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("PLAY HTTP %d %s\n", resp.StatusCode, trunc(raw))
+	for i := 0; i < 4; i++ {
+		time.Sleep(2 * time.Second)
+		resp, raw, err = signedCall(c, "GET", musicPrefix+"/playback", nil, "")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("[%ds] %s\n", (i+1)*2, strings.TrimSpace(string(raw)))
+		if resp.StatusCode != 200 {
+			break
+		}
+	}
 	return nil
 }
 
