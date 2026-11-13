@@ -1,4 +1,4 @@
-// codie-music-play frontend — vanilla JS, no build step.
+// codie-music-player frontend — vanilla JS, no build step.
 const $ = (sel) => document.querySelector(sel);
 const api = {
   async req(method, path, body) {

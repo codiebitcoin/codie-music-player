@@ -7,7 +7,7 @@
 1. `GET /v1/api/auth/bootstrap`（免签）→ 拿 `user_id`（签名必填）
 2. `POST /v1/api/auth/pair/request`（免签）→ 设备屏幕弹 6 位配对码，返回 `challenge_id`（5 分钟有效；不带 Origin/Referer 的请求不受来源校验限制）
 3. `POST /v1/api/auth/pair/confirm` `{pairing_code, challenge_id, auth_scope:"permanent"}` → 返回 **master secret**（`local_secret`）
-4. `POST /v1/api/auth/credentials` `{"label":"codie-music-play"}`（master 签名）→ 持久 **client credential**（id + secret）
+4. `POST /v1/api/auth/credentials` `{"label":"codie-music-player"}`（master 签名）→ 持久 **client credential**（id + secret）
 5. 之后所有请求用 client credential 签名（`X-Local-Session-Id` = credential id）
 
 > client credential 权限：可调 `/data/user/*` 全部（含音乐/媒体），仅 `/admin` 与凭证管理不可用（只能吊销自己）。master secret 只在配对当次使用，不落盘。

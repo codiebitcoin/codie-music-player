@@ -1,4 +1,4 @@
-// codie-music-play: play NetEase / QQ / Spotify / Bilibili music on a codie device.
+// codie-music-player: play NetEase / QQ / Spotify / Bilibili music on a codie device.
 //
 // Run modes (same as codie-life-connect):
 //   - service mode (default): web UI + REST API at http://127.0.0.1:8808
@@ -16,11 +16,11 @@ import (
 	"runtime"
 	"strings"
 
-	"codie-music-play/internal/api"
-	"codie-music-play/internal/codie"
-	"codie-music-play/internal/player"
-	"codie-music-play/internal/pluginhost"
-	"codie-music-play/internal/store"
+	"codie-music-player/internal/api"
+	"codie-music-player/internal/codie"
+	"codie-music-player/internal/player"
+	"codie-music-player/internal/pluginhost"
+	"codie-music-player/internal/store"
 
 	"github.com/egoist/mygo"
 )
@@ -43,7 +43,7 @@ func main() {
 	)
 	flag.Parse()
 	if *showVer {
-		log.Printf("codie-music-play %s (%s/%s)", version, runtime.GOOS, runtime.GOARCH)
+		log.Printf("codie-music-player %s (%s/%s)", version, runtime.GOOS, runtime.GOARCH)
 		return
 	}
 
@@ -88,7 +88,7 @@ func main() {
 
 	listen := *addr
 	go func() {
-		log.Printf("codie-music-play %s listening on http://%s (data: %s)", version, listen, *dataDir)
+		log.Printf("codie-music-player %s listening on http://%s (data: %s)", version, listen, *dataDir)
 		if err := http.ListenAndServe(listen, mux); err != nil {
 			log.Fatalf("http: %v", err)
 		}
@@ -97,7 +97,7 @@ func main() {
 	if *desktop {
 		mygo.App.WhenReady(func() {
 			mygo.NewWindow(mygo.WindowOptions{
-				Title:    "Codie Music Play",
+				Title:    "Codie Music Player",
 				URL:      "http://" + listen,
 				Width:    1180,
 				Height:   800,
@@ -136,14 +136,14 @@ func desktopDataDir() string {
 	switch runtime.GOOS {
 	case "darwin":
 		dir, _ := os.UserHomeDir()
-		return filepath.Join(dir, "Library", "Application Support", "CodieMusicPlay")
+		return filepath.Join(dir, "Library", "Application Support", "CodieMusicPlayer")
 	case "windows":
 		if appdata := os.Getenv("APPDATA"); appdata != "" {
-			return filepath.Join(appdata, "CodieMusicPlay")
+			return filepath.Join(appdata, "CodieMusicPlayer")
 		}
 	}
 	dir, _ := os.UserHomeDir()
-	return filepath.Join(dir, ".codie-music-play")
+	return filepath.Join(dir, ".codie-music-player")
 }
 
 func envOr(key, def string) string {

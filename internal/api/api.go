@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"codie-music-play/internal/codie"
-	"codie-music-play/internal/player"
-	"codie-music-play/internal/pluginhost"
-	"codie-music-play/internal/store"
+	"codie-music-player/internal/codie"
+	"codie-music-player/internal/player"
+	"codie-music-player/internal/pluginhost"
+	"codie-music-player/internal/store"
 
 	qrcode "github.com/skip2/go-qrcode"
 )
@@ -177,7 +177,7 @@ func (a *App) Handler() http.Handler {
 			return
 		}
 		c := codie.New(&codie.Creds{Addr: d.Addr})
-		creds, err := c.ConfirmPairing(challengeID, strings.TrimSpace(req.Code), "codie-music-play")
+		creds, err := c.ConfirmPairing(challengeID, strings.TrimSpace(req.Code), "codie-music-player")
 		if err != nil {
 			fail(w, 401, err)
 			return

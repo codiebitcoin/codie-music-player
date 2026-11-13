@@ -3,10 +3,10 @@
 // 用法：
 //
 //	m0 pair-request              # 设备屏幕弹出 6 位配对码
-//	m0 pair-confirm <code>       # 换取 master secret，并签发 codie-music-play 客户端凭据
+//	m0 pair-confirm <code>       # 换取 master secret，并签发 codie-music-player 客户端凭据
 //	m0 status                    # 签名请求：音乐库/存储/播放状态 + 媒体会话能力
 //	m0 library                   # 列出 TF 卡曲库（看 track_id 形态）
-//	m0 upload <file>             # multipart 上传到 TF 卡 directory=codie-music-play
+//	m0 upload <file>             # multipart 上传到 TF 卡 directory=codie-music-player
 //	m0 play <track_id>           # SELECT_TRACK 播放
 //	m0 playback                  # 查询播放状态
 //	m0 stop                      # 停止
@@ -33,8 +33,8 @@ const (
 	addr        = "http://192.168.1.160:8081"
 	stateFile   = ".m0-state.json"
 	credsFile   = ".m0-creds.json"
-	uploadDir   = "codie-music-play"
-	credLabel   = "codie-music-play"
+	uploadDir   = "codie-music-player"
+	credLabel   = "codie-music-player"
 	musicPrefix = "/v1/api/data/user/music"
 )
 
@@ -367,7 +367,7 @@ func doPlayQueue(trackIDs []string) error {
 		"queue_entry_id":          first,
 		// 字段名与设备自带音乐页面完全一致（snake_case）
 		"queue": map[string]any{
-			"storage_root": st.Data.RootPath, "title": "codie-music-play", "auto_advance": true, "revision": rev,
+			"storage_root": st.Data.RootPath, "title": "codie-music-player", "auto_advance": true, "revision": rev,
 			"entries": entries, "current_entry_id": first,
 		},
 	}

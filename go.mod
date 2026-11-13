@@ -1,4 +1,4 @@
-module codie-music-play
+module codie-music-player
 
 go 1.27.1
 

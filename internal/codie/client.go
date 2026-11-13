@@ -374,7 +374,7 @@ func (c *Client) PlayCardPaths(cardRoot string, cardPaths []string, title string
 		"action": "PLAY", "source": "LOCAL_TF", "request_id": fmt.Sprintf("cmp-%d", time.Now().UnixNano()),
 		"expected_queue_revision": 0, "queue_entry_id": ids[0],
 		"queue": map[string]any{
-			"storage_root": cardRoot, "title": first(title, "codie-music-play"), "auto_advance": true, "revision": 0,
+			"storage_root": cardRoot, "title": first(title, "codie-music-player"), "auto_advance": true, "revision": 0,
 			"entries": entries, "current_entry_id": ids[0],
 		},
 	}

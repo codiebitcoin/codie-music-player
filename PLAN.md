@@ -1,4 +1,4 @@
-# codie-music-play 项目计划
+# codie-music-player 项目计划
 
 > 让 codie 设备播放来自 **网易云 / QQ音乐 / Spotify / Bilibili** 的音乐。
 > 参考 [mygo-music](https://music.egoist.dev/)（egoist 的原生 Go 音乐播放器）的插件化音源思路，复用其插件生态，输出端接到 codie 设备。
@@ -60,7 +60,7 @@
 
 ```
 ┌────────────────────────────────────────────────┐
-│ codie-music-play（Go 单二进制，mygo 桌面应用）    │
+│ codie-music-player（Go 单二进制，mygo 桌面应用）    │
 │                                                │
 │  UI：搜索 / 平台切换 / 队列 / 正在播放 / 设备状态  │
 │                                                │
@@ -121,7 +121,7 @@
 ## 6. 仓库布局（拟）
 
 ```
-codie-music-play/
+codie-music-player/
 ├── PLAN.md
 ├── main.go                 # mygo 应用入口
 ├── internal/

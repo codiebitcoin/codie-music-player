@@ -249,7 +249,7 @@ func (h *Host) setupVM(vm *goja.Runtime) {
 		return goja.Undefined()
 	})
 	_ = hostObj.Set("webSignIn", func(call goja.FunctionCall) goja.Value {
-		panic(vm.NewTypeError("webSignIn is not supported by codie-music-play yet — use QR login"))
+		panic(vm.NewTypeError("webSignIn is not supported by codie-music-player yet — use QR login"))
 	})
 	vm.Set("host", hostObj)
 }

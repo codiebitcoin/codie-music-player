@@ -1,4 +1,4 @@
-# codie-music-play
+# codie-music-player
 
 让 codie 设备播放网易云 / QQ音乐 / Spotify / Bilibili 的音乐。
 

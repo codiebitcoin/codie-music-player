@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"codie-music-play/internal/codie"
-	"codie-music-play/internal/pluginhost"
+	"codie-music-player/internal/codie"
+	"codie-music-player/internal/pluginhost"
 )
 
 // Track is the normalized track shape shared by plugins (mygo-music music.Info subset).
@@ -328,7 +328,7 @@ func (p *Player) PlayAll(ctx context.Context) error {
 	p.mu.Lock()
 	p.Current = 0
 	p.mu.Unlock()
-	if err := cl.PlayCardPaths(cardRootOf(cl), paths, "codie-music-play"); err != nil {
+	if err := cl.PlayCardPaths(cardRootOf(cl), paths, "codie-music-player"); err != nil {
 		return err
 	}
 	p.notify()
