@@ -4,3 +4,7 @@
 
 # Go
 *.test
+codie-music-play
+build/
+data/
+third_party/go-qrcode/example_test.go

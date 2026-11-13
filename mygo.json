@@ -1,0 +1,20 @@
+{
+  "name": "Codie Music Play",
+  "identifier": "com.codie.musicplay",
+  "version": "0.1.0",
+  "copyright": "© 2026 codie-music-play contributors",
+  "main": ".",
+  "out": "build",
+  "macos": {
+    "infoPlist": {
+      "LSEnvironment": {
+        "CMP_DESKTOP": "1"
+      }
+    }
+  },
+  "linux": {
+    "maintainer": "codie-music-play <codie-music-play@users.noreply.github.com>",
+    "comment": "codie-music-play: play cloud music on your codie device",
+    "categories": ["Audio", "Network"]
+  }
+}

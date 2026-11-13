@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codie Music Play</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>🎵 Codie Music Play</h1>
+  <nav>
+    <button data-tab="search" class="active">搜索</button>
+    <button data-tab="queue">队列</button>
+    <button data-tab="devices">设备</button>
+    <button data-tab="plugins">音源</button>
+  </nav>
+  <div id="deviceBadge" class="badge">未连接设备</div>
+</header>
+
+<!-- 搜索 -->
+<section id="tab-search" class="tab active">
+  <div class="toolbar">
+    <select id="searchPlugin"></select>
+    <input id="searchInput" placeholder="歌名 / 歌手…" />
+    <button id="searchBtn" class="primary">搜索</button>
+  </div>
+  <div id="searchStatus" class="hint"></div>
+  <ul id="searchResults" class="list"></ul>
+</section>
+
+<!-- 队列 -->
+<section id="tab-queue" class="tab">
+  <div class="toolbar">
+    <button id="playAllBtn" class="primary">▶ 播放全部</button>
+    <button id="clearQueueBtn">清空队列</button>
+    <span class="hint">曲目会自动：取流 → 下载 → 上传 TF 卡 → 在设备播放</span>
+  </div>
+  <div id="nowPlaying" class="nowplaying empty">未在播放</div>
+  <div class="controls">
+    <button data-action="PREVIOUS">⏮</button>
+    <button data-action="PLAY" class="primary">▶</button>
+    <button data-action="PAUSE">⏸</button>
+    <button data-action="NEXT">⏭</button>
+    <button data-action="STOP">⏹</button>
+    <label>音量 <input id="volume" type="range" min="0" max="100"></label>
+  </div>
+  <ul id="queueList" class="list"></ul>
+</section>
+
+<!-- 设备 -->
+<section id="tab-devices" class="tab">
+  <div class="card">
+    <h3>添加设备（配对）</h3>
+    <div class="toolbar">
+      <input id="deviceName" placeholder="设备名（如 Hello）" />
+      <input id="deviceAddr" placeholder="IP:端口（如 192.168.1.160:8081）" />
+      <button id="pairStartBtn" class="primary">开始配对</button>
+    </div>
+    <div id="pairArea" hidden>
+      <p>设备屏幕上会显示 6 位配对码：</p>
+      <div class="toolbar">
+        <input id="pairCode" placeholder="6 位配对码" maxlength="6" inputmode="numeric" />
+        <button id="pairConfirmBtn" class="primary">确认配对</button>
+      </div>
+    </div>
+  </div>
+  <div id="deviceList"></div>
+  <div class="card">
+    <h3>设备状态</h3>
+    <pre id="deviceStatus" class="mono">…</pre>
+    <p class="hint">播放要求：①设备上打开音乐页面 ②TF 卡已插入。音源会自动切到 TF。</p>
+  </div>
+</section>
+
+<!-- 插件 -->
+<section id="tab-plugins" class="tab">
+  <h3>音源插件</h3>
+  <div id="presetList"></div>
+  <h3>已安装</h3>
+  <div id="installedList"></div>
+</section>
+
+<!-- 登录二维码弹层 -->
+<div id="qrModal" hidden>
+  <div class="qrbox">
+    <h3 id="qrTitle">扫码登录</h3>
+    <img id="qrImg" alt="登录二维码" />
+    <p id="qrText">等待二维码…</p>
+    <button id="qrClose">关闭</button>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
