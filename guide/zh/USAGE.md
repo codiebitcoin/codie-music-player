@@ -7,11 +7,11 @@
 
 | 平台 | 文件 | 安装方式 |
 |---|---|---|
-| macOS | `codie-music-player-0.1.24.dmg` | 打开 dmg，把 App 拖进 Applications |
-| Windows | `codie-music-player-setup-0.1.24-amd64.exe` | 双击运行安装器 |
-| Debian / Ubuntu | `codie-music-player_0.1.24_amd64.deb` | `sudo dpkg -i <文件>` 或双击安装 |
-| Fedora / RHEL | `codie-music-player-0.1.24-1.x86_64.rpm` | `sudo rpm -i <文件>` |
-| 其他 Linux | `codie-music-player-0.1.24-linux-amd64.tar.gz` | 解压后运行 `install.sh` |
+| macOS | `codie-music-player-0.1.25.dmg` | 打开 dmg，把 App 拖进 Applications |
+| Windows | `codie-music-player-setup-0.1.25-amd64.exe` | 双击运行安装器 |
+| Debian / Ubuntu | `codie-music-player_0.1.25_amd64.deb` | `sudo dpkg -i <文件>` 或双击安装 |
+| Fedora / RHEL | `codie-music-player-0.1.25-1.x86_64.rpm` | `sudo rpm -i <文件>` |
+| 其他 Linux | `codie-music-player-0.1.25-linux-amd64.tar.gz` | 解压后运行 `install.sh` |
 
 四个音源插件（网易云 / QQ / Bilibili / MyGotify）**已内置**，首次启动自动安装，无需手动添加。
 
