@@ -107,7 +107,7 @@ func (a *app) codieWizardView(c *ui.Context, p palette) {
 		switch w.step {
 		case 0: // bind the device
 			ui.Text(c, "绑定 Codie 设备").FontSize(17).FontWeight(700)
-			ui.Text(c, "输入设备的 IP 和端口（设备设置页可见，如 192.168.1.160:8081），点「开始配对」后设备屏幕会显示 6 位配对码。").
+			ui.Text(c, "输入设备 IP 即可（端口默认 8081，也可写完整 IP:端口），点「开始配对」后设备屏幕会显示 6 位配对码。").
 				FontSize(13).TextColor(p.muted).LineHeight(1.5)
 			if a.settings.Codie != nil {
 				ui.Text(c, "已配对："+a.settings.Codie.Addr).FontSize(13).TextColor(p.accent)
@@ -115,7 +115,7 @@ func (a *app) codieWizardView(c *ui.Context, p palette) {
 			ui.Text(c, a.codiePairing.status).FontSize(12.5).TextColor(p.muted)
 			if a.codiePairing.challenge == "" {
 				ui.Row(c).Gap(8).Children(func() {
-					ui.TextInput(c.Key("wiz-addr"), &a.codiePairing.addr).Placeholder("IP:端口").Width(230).FontSize(13)
+					ui.TextInput(c.Key("wiz-addr"), &a.codiePairing.addr).Placeholder("设备 IP").Width(230).FontSize(13)
 					if ui.Button(c.Key("wiz-pair"), "开始配对").Disabled(a.codiePairing.busy || a.codiePairing.addr == "").Clicked() {
 						go a.codiePair(a.codiePairing.addr)
 					}

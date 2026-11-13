@@ -461,7 +461,7 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 		})
 		row("配对新设备", a.codiePairing.status, func() {
 			if a.codiePairing.challenge == "" {
-				ui.TextInput(c.Key("codie-addr"), &a.codiePairing.addr).Placeholder("IP:端口（如 192.168.1.160:8081）").Width(240).FontSize(13)
+				ui.TextInput(c.Key("codie-addr"), &a.codiePairing.addr).Placeholder("设备 IP（端口默认 8081）").Width(240).FontSize(13)
 				if ui.Button(c.Key("codie-pair"), "开始配对").Disabled(a.codiePairing.busy || a.codiePairing.addr == "").Clicked() {
 					go a.codiePair(a.codiePairing.addr)
 				}

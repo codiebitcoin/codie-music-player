@@ -42,6 +42,7 @@ func (a *app) codieSink(src music.Source) music.Source {
 
 // codiePair asks the device at addr to show its code, and waits for it.
 func (a *app) codiePair(addr string) {
+	addr = codieout.NormalizeAddr(addr) // a bare IP is enough; the port defaults
 	a.codiePairing.busy, a.codiePairing.status = true, ""
 	a.codiePairing.addr = addr
 	a.redraw()

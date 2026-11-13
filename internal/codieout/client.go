@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -65,6 +66,25 @@ func New(creds *Creds) *Client {
 }
 
 func baseURL(addr string) string { return "http://" + strings.TrimSpace(addr) }
+
+// DefaultPort is the port every codie device listens on.
+const DefaultPort = "8081"
+
+// NormalizeAddr accepts a bare IP, an IP:port, or a URL and answers the
+// host:port the device is at: a bare host gets the default port.
+func NormalizeAddr(addr string) string {
+	addr = strings.TrimSpace(addr)
+	addr = strings.TrimPrefix(addr, "http://")
+	addr = strings.TrimPrefix(addr, "https://")
+	addr = strings.TrimSuffix(addr, "/")
+	if addr == "" {
+		return addr
+	}
+	if host, port, err := net.SplitHostPort(addr); err == nil && host != "" && port != "" {
+		return addr // port already present
+	}
+	return addr + ":" + DefaultPort
+}
 
 // Call performs a signed request (X-Local-Sig = HMAC-SHA256 over
 // METHOD|path|ts|nonce|payloadMode|bodyHash|userId).
