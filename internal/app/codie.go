@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"github.com/egoist/mygo"
 
 	"mygo-music/internal/codieout"
@@ -84,6 +86,26 @@ func (a *app) codieConfirm(code string) {
 			a.codiePairing.status = "已配对 " + creds.Addr
 			a.changed()
 			go a.codieTest()
+		}
+		a.redraw()
+	})
+}
+
+// codieClear deletes every song this app left on the card, off the main thread.
+func (a *app) codieClear() {
+	c := a.codieClient()
+	if c == nil {
+		return
+	}
+	a.codiePairing.busy, a.codiePairing.status = true, "正在清理设备歌曲…"
+	a.redraw()
+	n, err := c.ClearCardUploads()
+	mygo.RunOnMain(func() {
+		a.codiePairing.busy = false
+		if err != nil {
+			a.codieStatus = fmt.Sprintf("清理中断（已删 %d 个）：%v", n, err)
+		} else {
+			a.codieStatus = fmt.Sprintf("已清理 %d 首设备歌曲", n)
 		}
 		a.redraw()
 	})

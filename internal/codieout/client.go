@@ -15,9 +15,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -40,6 +42,11 @@ type Creds struct {
 	DeviceID  string `json:"device_id,omitempty"`
 	Name      string `json:"name,omitempty"`
 	PairedAt  int64  `json:"paired_at,omitempty"`
+	// QueueRev is the queue revision to hand the device next: the device
+	// refuses a queue whose expected revision differs from its own (and
+	// bumps its own by one on every accepted install), so the last known
+	// one is kept here and re-probed when it goes stale.
+	QueueRev int64 `json:"queue_rev,omitempty"`
 }
 
 // APIError is a non-2xx device response.
@@ -59,6 +66,7 @@ func (e *APIError) Error() string {
 type Client struct {
 	Creds *Creds
 	HTTP  *http.Client
+	revMu sync.Mutex
 }
 
 func New(creds *Creds) *Client {
@@ -126,6 +134,11 @@ func (c *Client) Call(method, path string, body []byte, mode, contentType string
 	req.Header.Set("X-Local-Body-Hash", bodyHash)
 	req.Header.Set("X-Local-User-Id", cr.UserID)
 	req.Header.Set("X-Local-Session-Id", cr.SessionID)
+	return c.doSigned(req)
+}
+
+// doSigned sends a request whose headers are already signed.
+func (c *Client) doSigned(req *http.Request) ([]byte, error) {
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("连不上 codie 设备（%v）——检查设备是否在线、地址是否正确", err)
@@ -141,6 +154,10 @@ func (c *Client) Call(method, path string, body []byte, mode, contentType string
 		return nil, friendly(codeErr(resp.StatusCode, e.Code, first(e.Message, trunc(raw, 200))))
 	}
 	return raw, nil
+}
+
+func urlQueryEscape(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "%", "%25"), " ", "%20")
 }
 
 // codeErr builds the raw APIError.
@@ -292,6 +309,10 @@ type MusicStorage struct {
 	RootPath  string `json:"root_path"`
 	CapacityT uint64 `json:"capacity_total_bytes"`
 	CapacityU uint64 `json:"capacity_used_bytes"`
+	Files     []struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+	} `json:"music_files"`
 }
 
 func (c *Client) MusicStorage() (*MusicStorage, error) {
@@ -314,6 +335,7 @@ type DevicePlayback struct {
 	Volume     int32  `json:"volume_level"`
 	ErrorCode  string `json:"error_code"`
 	ErrorMsg   string `json:"error_message"`
+	Applied    bool   `json:"applied"`
 }
 
 func (c *Client) Playback() (*DevicePlayback, error) {
@@ -352,21 +374,120 @@ func (c *Client) EnsureSource() error {
 	return nil
 }
 
-// UploadFile uploads one audio file to the TF card (multipart field "files").
-func (c *Client) UploadFile(path string) (string, error) {
+// MaxUploadBytes is what one upload may carry: the device caps a request body
+// at 200 MiB, and the multipart envelope takes a little on top.
+const MaxUploadBytes = 190 << 20
+
+// UploadAudio uploads one audio file under name (title.ext): oversize files
+// are split into <name>_1, _2, … with ffmpeg -c copy, uploaded in order, and
+// the on-card paths answered in play order.
+func (c *Client) UploadAudio(path, name string) ([]string, error) {
+	// Already on the card under this name? Reuse it — the same song plays
+	// again without an upload at all.
+	if card, ok := c.cardFileByName(name); ok {
+		return []string{card}, nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.Size() <= MaxUploadBytes {
+		card, err := c.uploadOne(path, name)
+		return []string{card}, err
+	}
+	// Oversize: split with ffmpeg, stream copy, so no re-encode.
+	segs, err := splitAudio(path, name, info.Size())
+	if err != nil {
+		return nil, fmt.Errorf("歌曲超过单次上传上限，自动分段失败（需要 ffmpeg）：%v", err)
+	}
+	var cards []string
+	for i, seg := range segs {
+		card, err := c.uploadOne(seg, fmt.Sprintf("%s_%d%s", name, i+1, filepath.Ext(name)))
+		if err != nil {
+			return nil, err
+		}
+		cards = append(cards, card)
+	}
+	return cards, nil
+}
+
+// splitAudio cuts path into ceil(size/MaxUploadBytes) pieces of copy-coded
+// audio in a temp dir, answering their paths in order.
+func splitAudio(path, name string, size int64) ([]string, error) {
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		for _, p := range []string{"/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"} {
+			if _, e := os.Stat(p); e == nil {
+				ffmpeg, err = p, nil
+				break
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	out, err := os.MkdirTemp("", "cmp-split-*")
+	if err != nil {
+		return nil, err
+	}
+	// How long one piece may be: the whole file's seconds spread over the
+	// pieces, from ffprobe; fall back to assuming ~1 MB per second of the
+	// typical 256 kbit/s stream when ffprobe is missing.
+	secs := float64(size) / (256 * 1024 / 8)
+	if ffprobe, e := exec.LookPath("ffprobe"); e == nil {
+		if b, e := exec.Command(ffprobe, "-v", "error", "-show_entries", "format=duration",
+			"-of", "csv=p=0", path).Output(); e == nil {
+			if d, e := strconv.ParseFloat(strings.TrimSpace(string(b)), 64); e == nil && d > 0 {
+				secs = d
+			}
+		}
+	}
+	pieces := int((size + MaxUploadBytes - 1) / MaxUploadBytes)
+	segTime := int(secs/float64(pieces)) + 2
+	pattern := filepath.Join(out, "seg-%03d"+filepath.Ext(name))
+	cmd := exec.Command(ffmpeg, "-hide_banner", "-loglevel", "error", "-i", path,
+		"-c", "copy", "-f", "segment", "-segment_time", strconv.Itoa(segTime), pattern)
+	if b, e := cmd.CombinedOutput(); e != nil {
+		return nil, fmt.Errorf("%v: %s", e, trunc(b, 200))
+	}
+	matches, _ := filepath.Glob(filepath.Join(out, "seg-*"))
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no segments produced")
+	}
+	return matches, nil
+}
+
+// cardFileByName looks a file up on the card by its exact name.
+func (c *Client) cardFileByName(name string) (string, bool) {
+	st, err := c.MusicStorage()
+	if err != nil {
+		return "", false
+	}
+	for _, f := range st.Files {
+		if f.Name == name {
+			return f.Path, true
+		}
+	}
+	return "", false
+}
+
+// uploadOne uploads one audio file to the TF card as name.
+func (c *Client) uploadOne(path, name string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
 	var buf bytes.Buffer
 	boundary := "cmp" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	buf.WriteString("--" + boundary + "\r\nContent-Disposition: form-data; name=\"conflict_policy\"\r\n\r\noverwrite\r\n")
-	buf.WriteString("--" + boundary + "\r\nContent-Disposition: form-data; name=\"files\"; filename=\"" + filepath.Base(path) + "\"\r\nContent-Type: application/octet-stream\r\n\r\n")
+	// skip: an existing file is not an error — if the upload comes back
+	// rejected as a duplicate, the file's card path is inferred below.
+	buf.WriteString("--" + boundary + "\r\nContent-Disposition: form-data; name=\"conflict_policy\"\r\n\r\nskip\r\n")
+	buf.WriteString("--" + boundary + "\r\nContent-Disposition: form-data; name=\"files\"; filename=\"" + name + "\"\r\nContent-Type: application/octet-stream\r\n\r\n")
 	buf.Write(data)
 	buf.WriteString("\r\n--" + boundary + "--\r\n")
 	raw, err := c.Call("POST", apiMusic+"/upload", buf.Bytes(), payloadMultipart, "multipart/form-data; boundary="+boundary)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("上传失败: %w", err)
 	}
 	var up struct {
 		Success bool   `json:"success"`
@@ -376,19 +497,151 @@ func (c *Client) UploadFile(path string) (string, error) {
 			Uploaded []struct {
 				Path string `json:"path"`
 			} `json:"uploaded"`
+			Rejected []struct {
+				Filename string `json:"filename"`
+				Code     string `json:"code"`
+			} `json:"rejected"`
 		} `json:"data"`
 	}
-	if json.Unmarshal(raw, &up) != nil || !up.Success || len(up.Data.Uploaded) == 0 {
-		return "", &APIError{Status: 200, Code: up.Code, Message: first(up.Message, trunc(raw, 200))}
+	var rej []struct {
+		Filename string `json:"filename"`
+		Code     string `json:"code"`
 	}
-	return up.Data.Uploaded[0].Path, nil
+	if json.Unmarshal(raw, &up) != nil || (!up.Success && up.Code != "UPLOAD_FAILED") {
+		return "", friendly(&APIError{Status: 200, Code: up.Code, Message: first(up.Message, trunc(raw, 200))})
+	}
+	if len(up.Data.Uploaded) > 0 {
+		return up.Data.Uploaded[0].Path, nil
+	}
+	for _, r := range up.Data.Rejected {
+		if r.Code == "DUPLICATE_FILE" && r.Filename == name {
+			// It's already there under the default upload directory.
+			if st, err := c.MusicStorage(); err == nil && st.IsLoaded {
+				return st.RootPath + "/code27/music/" + name, nil
+			}
+			return "", fmt.Errorf("设备上已有这首歌，但读取卡列表失败，稍后重试")
+		}
+		_ = rej
+	}
+	return "", friendly(&APIError{Status: 200, Code: up.Code, Message: first(up.Message, trunc(raw, 200))})
 }
 
-// PlayCardPaths plays the given on-card paths as a fresh queue.
-func (c *Client) PlayCardPaths(cardRoot string, cardPaths []string, title string) error {
-	if len(cardPaths) == 0 {
-		return fmt.Errorf("codie: empty queue")
+// ClearCardUploads deletes every music file on the card's default upload
+// directory (code27/music) — what this app and the device's own uploads leave.
+func (c *Client) ClearCardUploads() (int, error) {
+	var st MusicStorage
+	if err := c.GetJSON(apiMusic+"/storage", &st); err != nil {
+		return 0, err
 	}
+	if !st.IsLoaded {
+		return 0, fmt.Errorf("设备的 TF 卡未就绪")
+	}
+	const dir = "/code27/music/"
+	removed := 0
+	var lastErr error
+	for _, f := range st.Files {
+		if !strings.Contains(f.Path, dir) {
+			continue
+		}
+		if err := c.DeleteCardFile(f.Path); err != nil {
+			lastErr = err
+			continue
+		}
+		removed++
+	}
+	return removed, lastErr
+}
+
+// DeleteCardFile removes one file from the card by absolute path.
+func (c *Client) DeleteCardFile(cardPath string) error {
+	req, err := http.NewRequest("DELETE", baseURL(c.Creds.Addr)+apiMusic+"/file?path="+urlQueryEscape(cardPath), nil)
+	if err != nil {
+		return err
+	}
+	_, err = c.doSigned(req)
+	return err
+}
+
+// PlayCard plays one on-card file: SELECT_TRACK by its card path, retried
+// over the device's file-cache lag (an upload is invisible to the player for
+// a few seconds; a too-early select answers TRACK_NOT_FOUND and the folder —
+// which the device queues by itself, outside any revision check — carries
+// on from there). autoAdvance is unused here: the device queues the folder.
+func (c *Client) PlayCard(cardPath string) error {
+	target := "local:" + cardPath
+	for attempt := 0; attempt < 6; attempt++ {
+		if attempt > 0 {
+			time.Sleep(2500 * time.Millisecond)
+		}
+		requestID := fmt.Sprintf("cmp-%d", time.Now().UnixNano())
+		payload := map[string]any{
+			"action": "SELECT_TRACK", "source": "LOCAL_TF",
+			"request_id": requestID, "track_id": target,
+		}
+		body, _ := json.Marshal(payload)
+		if _, err := c.Call("POST", apiMusic+"/control", body, payloadJSON, ""); err != nil {
+			continue
+		}
+		switch out := c.awaitCommand(requestID, target, 5*time.Second); out {
+		case commandApplied:
+			return nil
+		case commandRejected, commandNoAnswer:
+			continue
+		}
+	}
+	return fmt.Errorf("设备没有开始播放——请确认设备已打开音乐页面、TF 卡已插入，稍后重试")
+}
+
+// command outcome of one control request, judged by the playback snapshot the
+// device answers with under the very request_id.
+type commandOutcome int
+
+const (
+	commandNoAnswer commandOutcome = iota
+	commandApplied
+	commandRejected
+)
+
+// awaitCommand watches the playback snapshot for the request's own answer. An
+// applied answer means the command was accepted, but the song only really
+// plays once the device lands on its track; a rejection (a stale file, a
+// closed page) answers within a beat.
+func (c *Client) awaitCommand(requestID, targetTrack string, wait time.Duration) commandOutcome {
+	deadline := time.Now().Add(wait)
+	accepted := false
+	for time.Now().Before(deadline) {
+		time.Sleep(500 * time.Millisecond)
+		pb, err := c.Playback()
+		if err != nil {
+			continue
+		}
+		if pb.ErrorCode != "" || pb.Status == "FAILED" {
+			return commandRejected // the failure state carries our request id
+		}
+		if pb.RequestID == requestID {
+			if pb.ErrorCode != "" || pb.Status == "FAILED" {
+				return commandRejected
+			}
+			if pb.Applied && pb.TrackID == targetTrack {
+				return commandApplied // accepted and landed on our song
+			}
+			if pb.Applied {
+				accepted = true // accepted; the switch lands on a later report
+			}
+			continue
+		}
+		if accepted && pb.TrackID == targetTrack {
+			return commandApplied
+		}
+		if accepted {
+			return commandRejected
+		}
+	}
+	return commandNoAnswer
+}
+
+// queuePayload builds one PLAY request over cardPaths at the given revision.
+func (c *Client) queuePayload(cardRoot string, cardPaths []string, title string, autoAdvance bool, rev int64, requestID string) map[string]any {
 	type entry struct {
 		ID      string `json:"id"`
 		TrackID string `json:"track_id"`
@@ -400,15 +653,14 @@ func (c *Client) PlayCardPaths(cardRoot string, cardPaths []string, title string
 		entries = append(entries, entry{ID: id, TrackID: "local:" + p})
 		ids = append(ids, id)
 	}
-	payload := map[string]any{
-		"action": "PLAY", "source": "LOCAL_TF", "request_id": fmt.Sprintf("cmp-%d", time.Now().UnixNano()),
-		"expected_queue_revision": 0, "queue_entry_id": ids[0],
+	return map[string]any{
+		"action": "PLAY", "source": "LOCAL_TF", "request_id": requestID,
+		"expected_queue_revision": rev, "queue_entry_id": ids[0],
 		"queue": map[string]any{
-			"storage_root": cardRoot, "title": first(title, "codie-music-player"), "auto_advance": true, "revision": 0,
+			"storage_root": cardRoot, "title": first(title, "codie-music-player"), "auto_advance": autoAdvance, "revision": rev,
 			"entries": entries, "current_entry_id": ids[0],
 		},
 	}
-	return c.PostJSON(apiMusic+"/control", payload, nil)
 }
 
 func sha256Hex(b []byte) string {

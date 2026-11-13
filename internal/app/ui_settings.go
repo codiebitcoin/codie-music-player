@@ -449,6 +449,9 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 				if ui.Button(c.Key("codie-test"), "测试").Disabled(a.codiePairing.busy).Clicked() {
 					go a.codieTest()
 				}
+				if ui.Button(c.Key("codie-clear"), "清理设备歌曲").Disabled(a.codiePairing.busy).Clicked() {
+					go a.codieClear()
+				}
 				if ui.Button(c.Key("codie-forget"), "忘记设备").Clicked() {
 					a.codieForget()
 				}

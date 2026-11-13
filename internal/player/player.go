@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -646,6 +647,26 @@ func (p *Player) sourceOf(t *music.Track) music.Source {
 	return p.Source(t.Source)
 }
 
+// trackLabel is how a track reads in a file name: title, or the artists and
+// it, deduplicated.
+func trackLabel(t *music.Track) string {
+	if t.Name == "" {
+		return t.ID
+	}
+	var artist string
+	for _, a := range t.Artists {
+		if artist == "" {
+			artist = a.Name
+		} else {
+			artist += "/" + a.Name
+		}
+	}
+	if artist == "" || strings.Contains(t.Name, artist) {
+		return t.Name
+	}
+	return artist + " - " + t.Name
+}
+
 // record tells the source of the current track, if it wants to know, that it
 // plays, once for each time it's played.
 func (p *Player) record() {
@@ -693,6 +714,9 @@ func (p *Player) loadSkipping(at, skipped, dir int, play bool, from time.Duratio
 	if src != nil && p.Codie != nil {
 		if sink := p.Codie(src); sink != nil {
 			// A codie device plays this stream source's tracks instead.
+			if n, ok := sink.(interface{ SetTrackTitle(id, title string) }); ok {
+				n.SetTrackTitle(t.ID, trackLabel(&t))
+			}
 			p.loadRemote(gen, sink, at, skipped, dir, play, from)
 			return
 		}

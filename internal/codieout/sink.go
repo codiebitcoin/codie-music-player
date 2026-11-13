@@ -29,11 +29,63 @@ type Sink struct {
 
 	mu     sync.Mutex
 	byCard map[string]string // card path -> original track id, of what was uploaded
+	titles map[string]string // track id -> display name, for the uploaded file's name
+	segNext map[string]string // split part on card -> its successor ("" ends it)
+}
+
+// SetTrackTitle remembers how to name a track's upload on the card.
+func (s *Sink) SetTrackTitle(id, title string) {
+	s.mu.Lock()
+	s.titles[id] = title
+	s.mu.Unlock()
+}
+
+// segPartOf says whether cardPath belongs to the split parts of id.
+func (s *Sink) segPartOf(id, cardPath string) bool {
+	t := s.titles[id]
+	if t == "" {
+		return false
+	}
+	base := cardPath[strings.LastIndex(cardPath, "/")+1:]
+	return strings.HasPrefix(base, sanitizeName(t)+"_")
+}
+
+// titleOf answers the remembered name of id, or a fallback derived from it.
+func (s *Sink) titleOf(id string) string {
+	s.mu.Lock()
+	t := s.titles[id]
+	s.mu.Unlock()
+	if t == "" {
+		t = s.Source.Info().ID + "-" + shortHash(id)
+	}
+	return sanitizeName(t)
+}
+
+// sanitizeName keeps a name fit for a card: no separators, length-capped.
+func sanitizeName(name string) string {
+	r := strings.NewReplacer("/", "／", "\\", "＼", ":", "：", "*", "＊", "?", "？", "\"", "＂", "<", "《", ">", "》", "|", "｜", "\n", " ")
+	name = strings.TrimSpace(r.Replace(name))
+	if name == "" {
+		name = "song"
+	}
+	const max = 80 // bytes on card names, UTF-8
+	if len(name) > max {
+		for len(name) > max {
+			name = name[:len(name)-3] // peel whole runes
+		}
+	}
+	return name
+}
+
+func shortHash(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:8])
 }
 
 // Wrap makes src play on the codie device of client.
 func Wrap(src music.Source, client *Client, cacheDir string, quality func() string) *Sink {
-	return &Sink{Source: src, client: client, cacheDir: cacheDir, quality: quality, byCard: map[string]string{}}
+	return &Sink{Source: src, client: client, cacheDir: cacheDir, quality: quality,
+		byCard: map[string]string{}, titles: map[string]string{}, segNext: map[string]string{}}
 }
 
 // Info is the wrapped source's, saying it plays remotely.
@@ -71,17 +123,30 @@ func (s *Sink) RemotePlay(ids []string, start int, position int64) error {
 	if !storage.IsLoaded {
 		return fmt.Errorf("设备的 TF 卡未就绪——请插入 TF 卡后重试")
 	}
-	card, err := s.client.UploadFile(local)
+	name := s.titleOf(id) + filepath.Ext(local)
+	cards, err := s.client.UploadAudio(local, name)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
-	s.byCard[card] = id
+	for i, card := range cards {
+		s.byCard[card] = id
+		if i > 0 {
+			prev := cards[i-1]
+			s.segNext[prev] = card
+		}
+	}
+	if len(cards) > 1 {
+		s.segNext[cards[len(cards)-1]] = ""
+	}
 	s.mu.Unlock()
 	if err := s.client.EnsureSource(); err != nil {
 		return err
 	}
-	if err := s.client.PlayCardPaths(storage.RootPath, []string{card}, ""); err != nil {
+	time.Sleep(2 * time.Second) // the device's file cache needs a beat to see the upload
+	// A split track plays its pieces on (autoAdvance) — the queue holds only
+	// those pieces; single tracks stop there, and the player moves on.
+	if err := s.client.PlayCard(cards[0]); err != nil {
 		return err
 	}
 	if position > 3000 {
@@ -108,21 +173,33 @@ func (s *Sink) RemoteState() (*music.RemoteState, error) {
 	if err != nil {
 		return nil, err
 	}
-	st := &music.RemoteState{
+	s.mu.Lock()
+	id, ours := s.byCard[strings.TrimPrefix(pb.TrackID, "local:")]
+	segNext := s.segNext[strings.TrimPrefix(pb.TrackID, "local:")]
+	knownSegment := segNext != "" || s.segPartOf(id, strings.TrimPrefix(pb.TrackID, "local:"))
+	s.mu.Unlock()
+	if pb.TrackID == "" && !pb.IsPlaying && pb.PositionMs <= 0 {
+		// Nothing plays there.
+		return &music.RemoteState{}, nil
+	}
+	if !ours {
+		// The device went off on its own (its old queue's auto-advance, or a
+		// hand on the device): don't claim it — the player waits a moment and
+		// moves the queue on itself.
+		return nil, nil
+	}
+	// A split track's piece just ended: play the next part here, so the song
+	// continues whatever the device's own folder queue would do.
+	if pb.TrackID != "" && knownSegment && !pb.IsPlaying && segNext != "" {
+		next := segNext
+		go func() { _ = s.client.PlayCard(next) }()
+	}
+	return &music.RemoteState{
 		Playing:  pb.IsPlaying,
+		TrackID:  id,
 		Position: pb.PositionMs,
 		Duration: pb.DurationMs,
-	}
-	s.mu.Lock()
-	if id, ok := s.byCard[strings.TrimPrefix(pb.TrackID, "local:")]; ok {
-		st.TrackID = id
-	} else if pb.TrackID == "" {
-		st.TrackID = ""
-	} else {
-		st.TrackID = "" // someone else's track: don't claim it
-	}
-	s.mu.Unlock()
-	return st, nil
+	}, nil
 }
 
 // download keeps the stream's audio in the cache dir, by its URL, so the same
