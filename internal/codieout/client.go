@@ -14,6 +14,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -97,7 +98,6 @@ func NormalizeAddr(addr string) string {
 // Call performs a signed request (X-Local-Sig = HMAC-SHA256 over
 // METHOD|path|ts|nonce|payloadMode|bodyHash|userId).
 func (c *Client) Call(method, path string, body []byte, mode, contentType string) ([]byte, error) {
-	cr := c.Creds
 	if contentType == "" && len(body) > 0 && mode != payloadMultipart {
 		contentType = "application/json"
 	}
@@ -107,12 +107,23 @@ func (c *Client) Call(method, path string, body []byte, mode, contentType string
 	} else if len(body) > 0 {
 		payloadMode, bodyHash = payloadJSON, sha256Hex(body)
 	}
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
-	nonce := randHex(16)
-	signPath := path
+	req, err := c.buildSigned(method, path, body, payloadMode, bodyHash, contentType)
+	if err != nil {
+		return nil, err
+	}
+	return c.doSigned(req)
+}
+
+// buildSigned prepares an http.Request with the X-Local-* signature headers.
+// fullPath may carry a query (only the path part is signed).
+func (c *Client) buildSigned(method, fullPath string, body []byte, payloadMode, bodyHash, contentType string) (*http.Request, error) {
+	cr := c.Creds
+	signPath := fullPath
 	if i := strings.IndexByte(signPath, '?'); i >= 0 {
 		signPath = signPath[:i]
 	}
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	nonce := randHex(16)
 	if cr.UserID == "" {
 		if uid, err := c.bootstrapUserID(); err == nil {
 			cr.UserID = uid
@@ -120,7 +131,7 @@ func (c *Client) Call(method, path string, body []byte, mode, contentType string
 	}
 	mac := hmac.New(sha256.New, []byte(cr.Secret))
 	mac.Write([]byte(strings.ToUpper(method) + "|" + signPath + "|" + ts + "|" + nonce + "|" + payloadMode + "|" + bodyHash + "|" + cr.UserID))
-	req, err := http.NewRequest(method, baseURL(cr.Addr)+path, bytes.NewReader(body))
+	req, err := http.NewRequest(method, baseURL(cr.Addr)+fullPath, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +145,7 @@ func (c *Client) Call(method, path string, body []byte, mode, contentType string
 	req.Header.Set("X-Local-Body-Hash", bodyHash)
 	req.Header.Set("X-Local-User-Id", cr.UserID)
 	req.Header.Set("X-Local-Session-Id", cr.SessionID)
-	return c.doSigned(req)
+	return req, nil
 }
 
 // doSigned sends a request whose headers are already signed.
@@ -157,7 +168,7 @@ func (c *Client) doSigned(req *http.Request) ([]byte, error) {
 }
 
 func urlQueryEscape(s string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(s, "%", "%25"), " ", "%20")
+	return url.QueryEscape(s)
 }
 
 // codeErr builds the raw APIError.
@@ -566,12 +577,16 @@ func (c *Client) ClearCardUploads() (int, error) {
 
 // DeleteCardFile removes one file from the card by absolute path.
 func (c *Client) DeleteCardFile(cardPath string) error {
-	req, err := http.NewRequest("DELETE", baseURL(c.Creds.Addr)+apiMusic+"/file?path="+urlQueryEscape(cardPath), nil)
+	full := apiMusic + "/file?path=" + urlQueryEscape(cardPath)
+	req, err := c.buildSigned("DELETE", full, nil, payloadEmpty, sha256Hex(nil), "")
 	if err != nil {
 		return err
 	}
 	_, err = c.doSigned(req)
-	return err
+	if err != nil {
+		return friendly(err)
+	}
+	return nil
 }
 
 // PlayCard plays one on-card file: SELECT_TRACK by its card path, retried
