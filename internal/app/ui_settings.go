@@ -435,8 +435,18 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 			}
 		})
 		if s.Codie != nil {
-			row("已配对设备", s.Codie.Addr+" · "+a.codieStatus(), func() {
-				if ui.Button(c.Key("codie-test"), "测试").Clicked() {
+			// 状态是异步取的（codieStatus 会发 HTTP，绝不能在绘制里同步等）：
+			// 首次进入自动刷一次，之后「测试」手动刷。
+			if !a.codieStatusAsked {
+				a.codieStatusAsked = true
+				go a.codieTest()
+			}
+			status := a.codieStatus
+			if status == "" {
+				status = "正在查询…"
+			}
+			row("已配对设备", s.Codie.Addr+" · "+status, func() {
+				if ui.Button(c.Key("codie-test"), "测试").Disabled(a.codiePairing.busy).Clicked() {
 					go a.codieTest()
 				}
 				if ui.Button(c.Key("codie-forget"), "忘记设备").Clicked() {

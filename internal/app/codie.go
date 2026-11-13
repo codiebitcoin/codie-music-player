@@ -40,23 +40,6 @@ func (a *app) codieSink(src music.Source) music.Source {
 	return codieout.Wrap(src, a.codieClient(), dir+"/codie", func() string { return a.settings.Quality })
 }
 
-// codieStatus says how the device is, for the settings row; empty when asked
-// nothing yet.
-func (a *app) codieStatus() string {
-	c := a.codieClient()
-	if c == nil {
-		return ""
-	}
-	st, err := c.MusicStorage()
-	if err != nil {
-		return err.Error()
-	}
-	if !st.IsLoaded {
-		return "在线 · TF 卡未就绪"
-	}
-	return "在线 · TF 卡就绪"
-}
-
 // codiePair asks the device at addr to show its code, and waits for it.
 func (a *app) codiePair(addr string) {
 	a.codiePairing.busy, a.codiePairing.status = true, ""
@@ -96,8 +79,10 @@ func (a *app) codieConfirm(code string) {
 		} else {
 			a.settings.Codie = creds
 			a.settings.CodieOn = true
+			a.codieStatus = "已配对，查询中…"
 			a.codiePairing.status = "已配对 " + creds.Addr
 			a.changed()
+			go a.codieTest()
 		}
 		a.redraw()
 	})
@@ -109,23 +94,32 @@ func (a *app) codieForget() {
 	a.changed()
 }
 
-// codieTest asks the device how it is, in a moment, for the row to say.
+// codieTest asks the device how it is — always called off the main thread —
+// and says it in the cached status the settings row shows.
 func (a *app) codieTest() {
-	a.codiePairing.busy = true
-	a.redraw()
+	mygo.RunOnMain(func() {
+		a.codiePairing.busy = true
+		a.redraw()
+	})
 	c := a.codieClient()
 	var status string
-	if c == nil {
+	switch {
+	case c == nil:
 		status = "未配对"
-	} else if st, err := c.MusicStorage(); err != nil {
-		status = err.Error()
-	} else if !st.IsLoaded {
-		status = "在线 · TF 卡未就绪"
-	} else {
-		status = "在线 · TF 卡就绪"
+	default:
+		st, err := c.MusicStorage()
+		switch {
+		case err != nil:
+			status = "离线：" + err.Error()
+		case !st.IsLoaded:
+			status = "在线 · TF 卡未就绪"
+		default:
+			status = "在线 · TF 卡就绪"
+		}
 	}
 	mygo.RunOnMain(func() {
 		a.codiePairing.busy = false
+		a.codieStatus = status
 		a.codiePairing.status = status
 		a.redraw()
 	})
