@@ -1,0 +1,121 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Codie Music Player 使用指南</title>
+<style>
+body { font-family: "Noto Sans CJK SC","PingFang SC","Microsoft YaHei",-apple-system,sans-serif; margin:0; color:#1f2329; }
+.wrap { max-width: 900px; margin: 0 auto; padding: 40px 48px; }
+h1 { font-size: 28px; border-bottom: 3px solid #4FC08D; padding-bottom: 10px; }
+h2 { font-size: 21px; margin-top: 36px; border-left: 5px solid #4FC08D; padding-left: 10px; }
+h3 { font-size: 17px; margin-top: 24px; }
+h4 { font-size: 15px; margin-top: 18px; }
+img { max-width: 100%; border: 1px solid #dee0e3; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+th,td { border: 1px solid #dee0e3; padding: 8px 10px; text-align: left; }
+th { background: #f5f6f7; }
+blockquote { background:#f0f9f4; border-left:4px solid #4FC08D; margin:12px 0; padding:8px 14px; color:#2f3a35; border-radius:0 8px 8px 0; }
+code { background:#f2f3f5; padding:2px 5px; border-radius:4px; font-size:13px; }
+pre { background:#f5f6f7; border:1px solid #dee0e3; border-radius:8px; padding:12px 14px; overflow:auto; white-space:pre-wrap; }
+pre code { background:none; padding:0; font-size:13px; }
+a { color:#4FC08D; }
+li { margin: 4px 0; }
+hr { border:none; border-top:1px solid #dee0e3; margin:28px 0; }
+h1,h2,h3,h4 { break-after: avoid; }
+img { break-inside: avoid; }
+tr { break-inside: avoid; }
+@media print { .wrap { padding: 12mm 10mm; max-width: none; } }
+</style>
+</head><body><div class="wrap"><h1 id="codie-music-player">Codie Music Player 使用指南</h1>
+<blockquote>
+<p>在 codie 设备上播放网易云音乐 / QQ 音乐 / Bilibili / Spotify(曲库) 的音乐。
+本播放器基于 <a href="https://github.com/egoist/mygo-music">mygo-music</a>（AGPL-3.0）构建。</p>
+</blockquote>
+<h2 id="_1">一、安装</h2>
+<table>
+<thead>
+<tr>
+<th>平台</th>
+<th>文件</th>
+<th>安装方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>macOS</td>
+<td><code>codie-music-player-0.1.24.dmg</code></td>
+<td>打开 dmg，把 App 拖进 Applications</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td><code>codie-music-player-setup-0.1.24-amd64.exe</code></td>
+<td>双击运行安装器</td>
+</tr>
+<tr>
+<td>Debian / Ubuntu</td>
+<td><code>codie-music-player_0.1.24_amd64.deb</code></td>
+<td><code>sudo dpkg -i &lt;文件&gt;</code> 或双击安装</td>
+</tr>
+<tr>
+<td>Fedora / RHEL</td>
+<td><code>codie-music-player-0.1.24-1.x86_64.rpm</code></td>
+<td><code>sudo rpm -i &lt;文件&gt;</code></td>
+</tr>
+<tr>
+<td>其他 Linux</td>
+<td><code>codie-music-player-0.1.24-linux-amd64.tar.gz</code></td>
+<td>解压后运行 <code>install.sh</code></td>
+</tr>
+</tbody>
+</table>
+<p>四个音源插件（网易云 / QQ / Bilibili / MyGotify）<strong>已内置</strong>，首次启动自动安装，无需手动添加。</p>
+<h2 id="_2">二、首次启动向导</h2>
+<p>第一次打开应用会自动弹出设置向导，共四步：</p>
+<h3 id="1-codie">第 1 步 · 绑定 codie 设备</h3>
+<ol>
+<li>在<strong>设备设置页</strong>查看设备的 IP 地址（例如 <code>192.168.1.160</code>）</li>
+<li>向导里输入 IP 即可（端口默认 8081，自动补全；也可以写完整 <code>IP:端口</code>）</li>
+<li>点「开始配对」→ <strong>设备屏幕会显示 6 位配对码</strong></li>
+<li>把 6 位码填进向导，点「确认配对」</li>
+</ol>
+<blockquote>
+<p>配对成功后应用会获得独立的客户端凭据，不影响其他已配对的客户端。</p>
+</blockquote>
+<h3 id="2">第 2 步 · 登录音源</h3>
+<p>每个音源点「登录」按钮：</p>
+<ul>
+<li><strong>网易云 / QQ / Bilibili</strong>：弹出二维码，用各自 App 扫码确认</li>
+<li><strong>MyGotify（Spotify 曲库）</strong>：免登录即可搜索播放；要同步自己的歌单/收藏再按插件设置里的说明配置</li>
+</ul>
+<p>不登录也能直接搜索播放（公开曲库），登录后解锁会员曲库和个人歌单。</p>
+<h3 id="3">第 3 步 · 尝试播放</h3>
+<p>点「播放测试曲」，应用会自动完成：搜索 → 取流 → 下载 → 上传到设备 TF 卡 → 设备播放。
+<strong>声音应该从 codie 设备的喇叭出来。</strong></p>
+<h3 id="4">第 4 步 · 完成</h3>
+<p>点「开始使用」即完成设置。以后随时可在 <strong>设置 → Codie</strong> 里：
+查看设备状态 / 测试连接 / 忘记设备 / 重新运行向导。</p>
+<h2 id="_3">三、日常使用</h2>
+<ul>
+<li><strong>搜索</strong>：左侧选音源，顶部搜索框输入歌名或歌手，点结果旁的 ▶ 直接播放到 codie</li>
+<li><strong>歌单 / 专辑 / 歌手页</strong>：登录后左侧会出现你的歌单、喜欢的音乐、每日推荐等（取决于音源支持）</li>
+<li><strong>播放控制</strong>：底部播放条可暂停/上下曲/拖进度/调音量，操作会同步到设备</li>
+<li><strong>歌词</strong>：正在播放页显示逐字歌词（音源支持时）</li>
+</ul>
+<h2 id="codie">四、codie 播放的前提条件</h2>
+<p>播放到设备需要同时满足：</p>
+<ol>
+<li><strong>设备插着 TF 卡</strong>（歌曲会临时上传到卡的 <code>code27/music/</code> 目录）</li>
+<li><strong>设备上打开了音乐页面</strong>（音乐 App 前台运行；应用无法远程打开它）</li>
+<li>设备与应用在<strong>同一局域网</strong></li>
+</ol>
+<p>满足以上条件时，音源会自动切到 TF 卡通道；播放时进度条实时跟随设备。</p>
+<h2 id="_4">五、常见问题</h2>
+<p><strong>点播放没声音？</strong>
+按顺序检查：① 设备音乐页面是否打开；② TF 卡是否插入（设置 → Codie → 测试，应显示"在线 · TF 卡就绪"）；③ 设备音量；④ 某些歌曲需要登录/会员，换个歌试试。</p>
+<p><strong>设置里显示"离线"？</strong>
+设备与应用不在同一网段，或设备 IP 变了（重启后可能换 IP）。到设备设置页确认新 IP，在 设置 → Codie 重新配对。</p>
+<p><strong>网易云提示需要登录 / 只能试听？</strong>
+版权或会员限制，扫码登录自己的账号即可。</p>
+<p><strong>Spotify 怎么是"MyGotify"？</strong>
+它把 Spotify 的曲库/歌单经 YouTube Music 出流（免登录、可推 codie）。官方 Spotify 客户端直连型插件是 remote 播放（在电脑本机出声），无法推到 codie。</p>
+<p><strong>想换设备 / 多台设备？</strong>
+设置 → Codie → 忘记设备，然后重新配对新设备即可（当前版本同一时间播一台）。</p>
+<hr>
+<p>Codie Music Player · AGPL-3.0 · 上游项目 <a href="https://github.com/egoist/mygo-music">egoist/mygo-music</a></p></div></body></html>
