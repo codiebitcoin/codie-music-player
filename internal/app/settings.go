@@ -88,6 +88,8 @@ type settings struct {
 	CodieOn bool `json:"codieOn,omitempty"`
 	// Codie is the paired codie device, when there is one.
 	Codie *codieout.Creds `json:"codie,omitempty"`
+	// CodieSetupDone says the first-run guide has been walked (or skipped).
+	CodieSetupDone bool `json:"codieSetupDone,omitempty"`
 
 	path string // where they were loaded from, and are saved to
 }

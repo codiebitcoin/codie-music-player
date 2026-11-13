@@ -73,6 +73,7 @@ func (a *app) view(c *ui.Context) {
 		a.nowPlayingLayer(c, npOpen, npSettled)
 	})
 	a.signInDialog(c, a.pal, false)
+	a.codieWizardView(c, a.pal)
 	a.playlistNameDialog(c)
 	a.deletePlaylistDialog(c)
 	if a.toast != "" {

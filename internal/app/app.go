@@ -77,6 +77,7 @@ type app struct {
 	captions  captionState    // the episode playing's captions, and the model they take
 	installer pluginInstaller // installing and updating plugins
 	codiePairing codiePairState // where the codie settings section is
+	wizard       wizardState    // the first-run guide, until it's done
 	// links are the app's links opened before its window was made, macOS
 	// handing over the one it was started with first.
 	links []string
@@ -343,6 +344,9 @@ func Run(bundledPlugins fs.FS) error {
 		a.settings.applyAppearance()
 		i18n.SetLanguage(i18n.Resolve(a.settings.Language, systemLanguages()))
 		ensureBundledPlugins(bundledPlugins)
+		if !a.settings.CodieSetupDone {
+			a.wizard.open = true
+		}
 		a.npPane = a.lyricsPaneChosen()
 		a.makeSources()
 		// Before the window: on Windows it lays out its content as it is

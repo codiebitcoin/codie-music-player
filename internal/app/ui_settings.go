@@ -444,6 +444,11 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 				}
 			})
 		}
+		row("设置向导", "重新走一遍：绑定机器 → 登录 → 尝试播放", func() {
+			if ui.Button(c.Key("codie-wizard-again"), "重新运行").Clicked() {
+				a.startWizard()
+			}
+		})
 		row("配对新设备", a.codiePairing.status, func() {
 			if a.codiePairing.challenge == "" {
 				ui.TextInput(c.Key("codie-addr"), &a.codiePairing.addr).Placeholder("IP:端口（如 192.168.1.160:8081）").Width(240).FontSize(13)
