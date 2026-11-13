@@ -79,6 +79,9 @@ type app struct {
 	codiePairing codiePairState // where the codie settings section is
 	codieStatus      string // how the paired device is, fetched async
 	codieStatusAsked bool   // the one-shot auto refresh of that
+	codieSongs       []CodieSong // the device card's songs, for the long-press menu
+	codieSongsErr    string
+	codieSongsAsked  bool
 	wizard       wizardState    // the first-run guide, until it's done
 	// links are the app's links opened before its window was made, macOS
 	// handing over the one it was started with first.

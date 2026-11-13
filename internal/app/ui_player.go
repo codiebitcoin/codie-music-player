@@ -465,10 +465,13 @@ func (a *app) playerBar(c *ui.Context) {
 			a.volumeButton(c, p.text.Alpha(0.75))
 			// 清理 codie： paired 时在音量按钮旁给出入口，把上传到设备 TF 卡的歌曲删掉。
 			if a.settings.Codie != nil {
-				if iconButton(c.Key("codie-clear"), iconTrash, 16, p.muted, "清理 codie 歌曲").Clicked() {
+				clear := iconButton(c.Key("codie-clear"), iconTrash, 16, p.muted, "清理 codie 歌曲")
+				if clear.Clicked() {
 					a.post(func() { a.toast = "正在清理 codie 设备歌曲…" })
 					go a.codieClearToasted()
 				}
+				// 长按（右键）：列出设备上的歌曲，单曲删除。
+				clear.ContextMenu(func(m *ui.Menu) { a.codieSongsMenu(m) })
 			}
 		})
 	})
