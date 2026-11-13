@@ -179,8 +179,8 @@ func friendly(err error) error {
 		return fmt.Errorf("设备的 TF 卡未就绪——请插入 TF 卡后重试")
 	case "MEDIA_UPLOAD_BUSY":
 		return fmt.Errorf("设备正在处理上一个上传，稍等几秒再试")
-	case "MEDIA_STORAGE_FULL", "BODY_TOO_LARGE":
-		return fmt.Errorf("设备存储空间不足，清理 TF 卡后重试")
+	case "MEDIA_STORAGE_FULL", "BODY_TOO_LARGE", "INSUFFICIENT_SPACE":
+		return fmt.Errorf("设备 TF 卡空间不足——点播放栏音量旁的 🗑 清理设备歌曲后重试")
 	case "INVALID_SIGNATURE", "LOCAL_SESSION_EXPIRED", "LOCAL_SECRET_MISMATCH", "LOCAL_USER_MISMATCH":
 		return fmt.Errorf("设备凭据已失效——到 设置 → Codie 重新配对")
 	case "UNAUTHORIZED":
@@ -391,6 +391,15 @@ func (c *Client) UploadAudio(path, name string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Room check before pushing bytes for nothing: the file (or its split
+	// parts, which total about the same) must fit with a little of margin.
+	if st, err := c.MusicStorage(); err == nil && st.IsLoaded {
+		free := int64(st.CapacityT) - int64(st.CapacityU)
+		if info.Size()+4<<20 > free {
+			return nil, fmt.Errorf("设备 TF 卡剩余空间不够放这首歌（%.0fMB 剩余，需要 %.0fMB）——点播放栏音量旁的 🗑 清理设备歌曲后重试",
+				float64(free)/(1<<20), float64(info.Size())/(1<<20))
+		}
+	}
 	if info.Size() <= MaxUploadBytes {
 		card, err := c.uploadOne(path, name)
 		return []string{card}, err
@@ -514,6 +523,9 @@ func (c *Client) uploadOne(path, name string) (string, error) {
 		return up.Data.Uploaded[0].Path, nil
 	}
 	for _, r := range up.Data.Rejected {
+		if r.Code == "INSUFFICIENT_SPACE" {
+			return "", fmt.Errorf("设备 TF 卡空间不足——点播放栏音量旁的 🗑 清理设备歌曲后重试")
+		}
 		if r.Code == "DUPLICATE_FILE" && r.Filename == name {
 			// It's already there under the default upload directory.
 			if st, err := c.MusicStorage(); err == nil && st.IsLoaded {
