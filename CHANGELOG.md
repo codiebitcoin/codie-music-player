@@ -2,6 +2,18 @@
 
 All notable changes to MyGo Music are written down here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.1.26] - 2026-11-17
+
+### Added
+
+- YouTube Music ships with the app as a fifth bundled source; its search and its friendly errors work now.
+- Long-press the trash button on the codie card to list every song on the card, delete one at a time, or 删除全部 at the foot.
+
+### Fixed
+
+- Uploading to the codie card checks the TF card's free space first and, when it falls short, points at the clear button instead of failing with a bare error.
+- Deleting a file from the codie card signs its request again, so it no longer fails with a 401, and files with Chinese in their names are addressed properly.
+
 ## [0.1.24] - 2026-11-11
 
 ### Changed
@@ -241,6 +253,7 @@ All notable changes to MyGo Music are written down here. Versions follow [Semant
 
 The first release: a native music player that plays your local files and gets everything else from plugins.
 
+[0.1.26]: https://github.com/codiebitcoin/codie-music-player/compare/v0.1.25...v0.1.26
 [0.1.22]: https://github.com/egoist/mygo-music/compare/v0.1.21...v0.1.22
 [0.1.21]: https://github.com/egoist/mygo-music/compare/v0.1.20...v0.1.21
 [0.1.20]: https://github.com/egoist/mygo-music/compare/v0.1.19...v0.1.20
