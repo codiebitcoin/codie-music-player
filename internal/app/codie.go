@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	"github.com/egoist/mygo"
 
 	"mygo-music/internal/codieout"
@@ -11,11 +9,11 @@ import (
 
 // codiePairState is where the codie settings section is: what's being paired.
 type codiePairState struct {
-	addr       string // the address being paired
-	code       string // the pairing code being typed
-	challenge  string // the pairing challenge, once the device shows its code
-	busy       bool   // a pair step is on its way
-	status     string // the last thing that happened, for the row to say
+	addr      string // the address being paired
+	code      string // the pairing code being typed
+	challenge string // the pairing challenge, once the device shows its code
+	busy      bool   // a pair step is on its way
+	status    string // the last thing that happened, for the row to say
 }
 
 // codieClient answers the paired device's client, or nil.
@@ -57,7 +55,7 @@ func (a *app) codiePair(addr string) {
 			a.codiePairing.challenge = ""
 		} else {
 			a.codiePairing.challenge = challenge
-			a.codiePairing.status = "看设备屏幕上的 6 位配对码，填到下面"
+			a.codiePairing.status = T("Enter the 6-digit code shown on the device's screen")
 		}
 		a.redraw()
 	})
@@ -70,7 +68,7 @@ func (a *app) codieConfirm(code string) {
 	if challenge == "" {
 		return
 	}
-	a.codiePairing.busy, a.codiePairing.status = true, "确认中…"
+	a.codiePairing.busy, a.codiePairing.status = true, T("Confirming…")
 	a.redraw()
 	c := codieout.New(&codieout.Creds{Addr: a.codiePairing.addr})
 	creds, err := c.ConfirmPairing(challenge, code)
@@ -82,8 +80,8 @@ func (a *app) codieConfirm(code string) {
 		} else {
 			a.settings.Codie = creds
 			a.settings.CodieOn = true
-			a.codieStatus = "已配对，查询中…"
-			a.codiePairing.status = "已配对 " + creds.Addr
+			a.codieStatus = T("Paired, checking…")
+			a.codiePairing.status = Tf("Paired to %s", creds.Addr)
 			a.changed()
 			go a.codieTest()
 		}
@@ -97,15 +95,15 @@ func (a *app) codieClear() {
 	if c == nil {
 		return
 	}
-	a.codiePairing.busy, a.codiePairing.status = true, "正在清理设备歌曲…"
+	a.codiePairing.busy, a.codiePairing.status = true, T("Clearing device songs…")
 	a.redraw()
 	n, err := c.ClearCardUploads()
 	mygo.RunOnMain(func() {
 		a.codiePairing.busy = false
 		if err != nil {
-			a.codieStatus = fmt.Sprintf("清理中断（已删 %d 个）：%v", n, err)
+			a.codieStatus = Tf("Clearing stopped after %d deleted: %v", n, err)
 		} else {
-			a.codieStatus = fmt.Sprintf("已清理 %d 首设备歌曲", n)
+			a.codieStatus = Tf("Cleared %d device songs", n)
 		}
 		a.redraw()
 	})
@@ -115,15 +113,15 @@ func (a *app) codieClear() {
 func (a *app) codieClearToasted() {
 	c := a.codieClient()
 	if c == nil {
-		a.post(func() { a.toast = "未配对 codie 设备" })
+		a.post(func() { a.toast = T("No codie device paired") })
 		return
 	}
 	n, err := c.ClearCardUploads()
 	a.post(func() {
 		if err != nil {
-			a.toast = fmt.Sprintf("清理中断（已删 %d 个）：%v", n, err)
+			a.toast = Tf("Clearing stopped after %d deleted: %v", n, err)
 		} else {
-			a.toast = fmt.Sprintf("已清理 codie 上 %d 首歌曲", n)
+			a.toast = Tf("Cleared %d songs from codie", n)
 		}
 	})
 }
@@ -145,16 +143,16 @@ func (a *app) codieTest() {
 	var status string
 	switch {
 	case c == nil:
-		status = "未配对"
+		status = T("Not paired")
 	default:
 		st, err := c.MusicStorage()
 		switch {
 		case err != nil:
-			status = "离线：" + err.Error()
+			status = Tf("Offline: %s", err.Error())
 		case !st.IsLoaded:
-			status = "在线 · TF 卡未就绪"
+			status = T("Online · TF card not ready")
 		default:
-			status = "在线 · TF 卡就绪"
+			status = T("Online · TF card ready")
 		}
 	}
 	mygo.RunOnMain(func() {

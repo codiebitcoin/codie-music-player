@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -22,6 +23,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"mygo-music/internal/i18n"
 )
 
 const (
@@ -152,7 +155,7 @@ func (c *Client) buildSigned(method, fullPath string, body []byte, payloadMode, 
 func (c *Client) doSigned(req *http.Request) ([]byte, error) {
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("连不上 codie 设备（%v）——检查设备是否在线、地址是否正确", err)
+		return nil, errors.New(i18n.Tf("Can't reach the codie device (%v) — check that it's online and the address is right", err))
 	}
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	resp.Body.Close()
@@ -185,17 +188,17 @@ func friendly(err error) error {
 	}
 	switch ae.Code {
 	case "MODE_INACTIVE", "MUSIC_MODE_INACTIVE":
-		return fmt.Errorf("设备上没有打开音乐页面——请先在 codie 设备上打开音乐 App，再点播放")
+		return errors.New(i18n.T("The device's music page isn't open — open the music app on the codie device first, then press play"))
 	case "TF_CARD_NOT_READY", "MUSIC_TF_NOT_READY":
-		return fmt.Errorf("设备的 TF 卡未就绪——请插入 TF 卡后重试")
+		return errors.New(i18n.T("The device's TF card isn't ready — put the card in and try again"))
 	case "MEDIA_UPLOAD_BUSY":
-		return fmt.Errorf("设备正在处理上一个上传，稍等几秒再试")
+		return errors.New(i18n.T("The device is still working on the last upload; wait a few seconds and try again"))
 	case "MEDIA_STORAGE_FULL", "BODY_TOO_LARGE", "INSUFFICIENT_SPACE":
-		return fmt.Errorf("设备 TF 卡空间不足——点播放栏音量旁的 🗑 清理设备歌曲后重试")
+		return errors.New(i18n.T("The device's TF card is full — tap 🗑 by the volume to clear device songs and try again"))
 	case "INVALID_SIGNATURE", "LOCAL_SESSION_EXPIRED", "LOCAL_SECRET_MISMATCH", "LOCAL_USER_MISMATCH":
-		return fmt.Errorf("设备凭据已失效——到 设置 → Codie 重新配对")
+		return errors.New(i18n.T("The device's credentials have expired — pair again in Settings → Codie"))
 	case "UNAUTHORIZED":
-		return fmt.Errorf("设备拒绝了本次请求——可能刚重启，稍后重试或重新配对")
+		return errors.New(i18n.T("The device refused the request — it may have just restarted; try again in a moment or pair again"))
 	}
 	return err
 }
@@ -407,8 +410,8 @@ func (c *Client) UploadAudio(path, name string) ([]string, error) {
 	if st, err := c.MusicStorage(); err == nil && st.IsLoaded {
 		free := int64(st.CapacityT) - int64(st.CapacityU)
 		if info.Size()+4<<20 > free {
-			return nil, fmt.Errorf("设备 TF 卡剩余空间不够放这首歌（%.0fMB 剩余，需要 %.0fMB）——点播放栏音量旁的 🗑 清理设备歌曲后重试",
-				float64(free)/(1<<20), float64(info.Size())/(1<<20))
+			return nil, errors.New(i18n.Tf("The device's TF card doesn't have room for this song (%.0fMB left, needs %.0fMB) — tap 🗑 by the volume to clear device songs and try again",
+				float64(free)/(1<<20), float64(info.Size())/(1<<20)))
 		}
 	}
 	if info.Size() <= MaxUploadBytes {
@@ -418,7 +421,7 @@ func (c *Client) UploadAudio(path, name string) ([]string, error) {
 	// Oversize: split with ffmpeg, stream copy, so no re-encode.
 	segs, err := splitAudio(path, name, info.Size())
 	if err != nil {
-		return nil, fmt.Errorf("歌曲超过单次上传上限，自动分段失败（需要 ffmpeg）：%v", err)
+		return nil, errors.New(i18n.Tf("The song is over the one-upload limit and splitting it failed (ffmpeg needed): %v", err))
 	}
 	var cards []string
 	for i, seg := range segs {
@@ -507,7 +510,7 @@ func (c *Client) uploadOne(path, name string) (string, error) {
 	buf.WriteString("\r\n--" + boundary + "--\r\n")
 	raw, err := c.Call("POST", apiMusic+"/upload", buf.Bytes(), payloadMultipart, "multipart/form-data; boundary="+boundary)
 	if err != nil {
-		return "", fmt.Errorf("上传失败: %w", err)
+		return "", errors.New(i18n.Tf("upload failed: %v", err))
 	}
 	var up struct {
 		Success bool   `json:"success"`
@@ -535,14 +538,14 @@ func (c *Client) uploadOne(path, name string) (string, error) {
 	}
 	for _, r := range up.Data.Rejected {
 		if r.Code == "INSUFFICIENT_SPACE" {
-			return "", fmt.Errorf("设备 TF 卡空间不足——点播放栏音量旁的 🗑 清理设备歌曲后重试")
+			return "", errors.New(i18n.T("The device's TF card is full — tap 🗑 by the volume to clear device songs and try again"))
 		}
 		if r.Code == "DUPLICATE_FILE" && r.Filename == name {
 			// It's already there under the default upload directory.
 			if st, err := c.MusicStorage(); err == nil && st.IsLoaded {
 				return st.RootPath + "/code27/music/" + name, nil
 			}
-			return "", fmt.Errorf("设备上已有这首歌，但读取卡列表失败，稍后重试")
+			return "", errors.New(i18n.T("The song is already on the device, but reading the card's list failed; try again in a moment"))
 		}
 		_ = rej
 	}
@@ -557,7 +560,7 @@ func (c *Client) ClearCardUploads() (int, error) {
 		return 0, err
 	}
 	if !st.IsLoaded {
-		return 0, fmt.Errorf("设备的 TF 卡未就绪")
+		return 0, errors.New(i18n.T("The device's TF card isn't ready"))
 	}
 	const dir = "/code27/music/"
 	removed := 0
@@ -616,7 +619,7 @@ func (c *Client) PlayCard(cardPath string) error {
 			continue
 		}
 	}
-	return fmt.Errorf("设备没有开始播放——请确认设备已打开音乐页面、TF 卡已插入，稍后重试")
+	return errors.New(i18n.T("The device didn't start playing — check that its music page is open and the TF card is in, then try again"))
 }
 
 // command outcome of one control request, judged by the playback snapshot the

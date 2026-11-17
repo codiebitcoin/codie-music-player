@@ -429,8 +429,8 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 	})
 
 	add("codie", "Codie", iconVolume, func(row settingsRow, block settingsBlock) {
-		row("在 Codie 设备上播放", "流媒体音源的歌曲经 TF 卡推到 codie 设备播放（设备需打开音乐页面、插好 TF 卡）", func() {
-			if ui.Switch(c.Key("codie-on"), &s.CodieOn).Label("在 Codie 设备上播放").Disabled(s.Codie == nil).Changed() {
+		row(T("Play on the Codie device"), T("Songs from streaming sources go to the codie device over its TF card (the device needs its music page open and the TF card in)"), func() {
+			if ui.Switch(c.Key("codie-on"), &s.CodieOn).Label(T("Play on the Codie device")).Disabled(s.Codie == nil).Changed() {
 				a.changed()
 			}
 		})
@@ -443,34 +443,34 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 			}
 			status := a.codieStatus
 			if status == "" {
-				status = "正在查询…"
+				status = T("Checking…")
 			}
-			row("已配对设备", s.Codie.Addr+" · "+status, func() {
-				if ui.Button(c.Key("codie-test"), "测试").Disabled(a.codiePairing.busy).Clicked() {
+			row(T("Paired device"), s.Codie.Addr+" · "+status, func() {
+				if ui.Button(c.Key("codie-test"), T("Test")).Disabled(a.codiePairing.busy).Clicked() {
 					go a.codieTest()
 				}
-				if ui.Button(c.Key("codie-clear"), "清理设备歌曲").Disabled(a.codiePairing.busy).Clicked() {
+				if ui.Button(c.Key("codie-clear"), T("Clear device songs")).Disabled(a.codiePairing.busy).Clicked() {
 					go a.codieClear()
 				}
-				if ui.Button(c.Key("codie-forget"), "忘记设备").Clicked() {
+				if ui.Button(c.Key("codie-forget"), T("Forget device")).Clicked() {
 					a.codieForget()
 				}
 			})
 		}
-		row("设置向导", "重新走一遍：绑定机器 → 登录 → 尝试播放", func() {
-			if ui.Button(c.Key("codie-wizard-again"), "重新运行").Clicked() {
+		row(T("Setup guide"), T("Walk it again: pair the device → sign in → try a song"), func() {
+			if ui.Button(c.Key("codie-wizard-again"), T("Run again")).Clicked() {
 				a.startWizard()
 			}
 		})
-		row("配对新设备", a.codiePairing.status, func() {
+		row(T("Pair a new device"), a.codiePairing.status, func() {
 			if a.codiePairing.challenge == "" {
-				ui.TextInput(c.Key("codie-addr"), &a.codiePairing.addr).Placeholder("设备 IP（端口默认 8081）").Width(240).FontSize(13)
-				if ui.Button(c.Key("codie-pair"), "开始配对").Disabled(a.codiePairing.busy || a.codiePairing.addr == "").Clicked() {
+				ui.TextInput(c.Key("codie-addr"), &a.codiePairing.addr).Placeholder(T("Device IP (port 8081 by default)")).Width(240).FontSize(13)
+				if ui.Button(c.Key("codie-pair"), T("Start pairing")).Disabled(a.codiePairing.busy || a.codiePairing.addr == "").Clicked() {
 					go a.codiePair(a.codiePairing.addr)
 				}
 			} else {
-				ui.TextInput(c.Key("codie-code"), &a.codiePairing.code).Placeholder("6 位配对码").Width(140).FontSize(13).AutoFocus()
-				if ui.Button(c.Key("codie-confirm"), "确认配对").Disabled(a.codiePairing.busy || a.codiePairing.code == "").Clicked() {
+				ui.TextInput(c.Key("codie-code"), &a.codiePairing.code).Placeholder(T("6-digit code")).Width(140).FontSize(13).AutoFocus()
+				if ui.Button(c.Key("codie-confirm"), T("Confirm pairing")).Disabled(a.codiePairing.busy || a.codiePairing.code == "").Clicked() {
 					go a.codieConfirm(a.codiePairing.code)
 				}
 			}

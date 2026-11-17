@@ -3,6 +3,7 @@ package codieout
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"mygo-music/internal/i18n"
 	"mygo-music/internal/music"
 )
 
@@ -27,9 +29,9 @@ type Sink struct {
 	cacheDir string
 	quality  func() string // the app's quality setting
 
-	mu     sync.Mutex
-	byCard map[string]string // card path -> original track id, of what was uploaded
-	titles map[string]string // track id -> display name, for the uploaded file's name
+	mu      sync.Mutex
+	byCard  map[string]string // card path -> original track id, of what was uploaded
+	titles  map[string]string // track id -> display name, for the uploaded file's name
 	segNext map[string]string // split part on card -> its successor ("" ends it)
 }
 
@@ -121,7 +123,7 @@ func (s *Sink) RemotePlay(ids []string, start int, position int64) error {
 		return err // already friendly: offline / credential hints
 	}
 	if !storage.IsLoaded {
-		return fmt.Errorf("设备的 TF 卡未就绪——请插入 TF 卡后重试")
+		return errors.New(i18n.T("The device's TF card isn't ready — put the card in and try again"))
 	}
 	name := s.titleOf(id) + filepath.Ext(local)
 	cards, err := s.client.UploadAudio(local, name)
