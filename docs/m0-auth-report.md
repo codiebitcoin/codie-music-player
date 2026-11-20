@@ -1,6 +1,6 @@
 # M0 Spike 结论：codie 本地鉴权 + 音乐 API 实测（2026-11-12）
 
-设备：Hello（192.168.1.208:8081），实测全通（除 TF 卡上传因设备未插卡暂缓）。
+设备：Hello（局域网地址，形如 192.168.1.20:8081），实测全通（除 TF 卡上传因设备未插卡暂缓）。
 
 ## 鉴权链路（全通 ✅）
 
@@ -66,14 +66,14 @@ sig = HMAC-SHA256_hex(secret,
 
 # 附录：播放闭环实测（2026-11-13，全通 ✅）
 
-设备重启后 IP 变为 192.168.1.160（原 .208），TF 卡挂载 `/storage/A87B-A1540`（119MB 小卡）。
+设备重启后 IP 会变（DHCP），TF 卡挂载 `/storage/XXXX-XXXX`（卷 UUID，119MB 小卡）。
 `m0 upload` → `m0 playq` 全链路打通，设备喇叭实际出声，`PLAYING` 状态进度实时推进（position_ms 1.2s→7.4s）。
 
 ## 播放五要素（缺一不可，都是实测踩出来的）
 
 1. **音乐页面开启**（设备屏幕上手动打开；HTTP 无远程开启接口，关闭时播放类 action 一律 409 `MODE_INACTIVE`）
 2. **音源 = `LOCAL_TF`**：`GET /music/source` 查看当前值。设备端开音乐页时 Android 可能把音源切到 `BLUETOOTH`（origin:ANDROID），此时 TF 播放命令**被静默忽略**（200 accepted 但 music_session_version 不动）。先 `POST /music/source {"source":"LOCAL_TF"}` 再播
-3. **track_id 格式 = `local:` + TF 卡完整路径**，如 `local:/storage/A87B-A1540/code27/music/x.m4a`（裸文件名 → `TRACK_NOT_FOUND`）
+3. **track_id 格式 = `local:` + TF 卡完整路径**，如 `local:/storage/XXXX-XXXX/code27/music/x.m4a`（裸文件名 → `TRACK_NOT_FOUND`）
 4. **播放 = `PLAY` + 内联 queue**（不是 SELECT_TRACK 裸 track_id——那只查 Android 当前队列）：
    ```json
    POST /v1/api/data/user/music/control
@@ -82,7 +82,7 @@ sig = HMAC-SHA256_hex(secret,
      "expected_queue_revision": 0,
      "queue_entry_id": "<entry uuid>",
      "queue": {
-       "storage_root": "/storage/A87B-A1540", "title": "...", "auto_advance": true, "revision": 0,
+       "storage_root": "/storage/XXXX-XXXX", "title": "...", "auto_advance": true, "revision": 0,
        "entries": [{"id": "<uuid>", "track_id": "local:/storage/.../x.m4a"}],
        "current_entry_id": "<entry uuid>"
      }
@@ -97,4 +97,4 @@ sig = HMAC-SHA256_hex(secret,
 - 播放命令全部异步：HTTP 200 只代表已入队下发，真实结果看 `GET /music/playback`（`status/position_ms/applied/error_code`，`music_session_version` 跳变 = Android 真正处理了）
 - 当前固件无 `/music/library`、`/media/*`（1.6.0 分支的路由，404）；固件落后于 1.6.0 dev 分支
 - 设备重启会换 IP（DHCP），需按 user_id 扫描发现（同一子网可能有多台 codie 设备，不能按 IP 认）
-- 参考实现：设备自带音乐页面的行为（确认状态机 + `/v1/ws/events` 的 `music_playback` 事件）
+- 参考实现：设备自带音乐页面的行为（队列构造 / 确认状态机 + `/v1/ws/events` 的 `music_playback` 事件）

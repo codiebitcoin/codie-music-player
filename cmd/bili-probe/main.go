@@ -24,7 +24,7 @@ func main() {
 	}
 	var raw map[string]string
 	json.Unmarshal(b, &raw)
-	creds = codieout.Creds{Addr: "192.168.1.160:8081", Secret: raw["secret"], SessionID: raw["session_id"], UserID: raw["user_id"], Kind: "client"}
+	creds = codieout.Creds{Addr: "192.168.1.20:8081", Secret: raw["secret"], SessionID: raw["session_id"], UserID: raw["user_id"], Kind: "client"}
 	client := codieout.New(&creds)
 	st, err := client.MusicStorage()
 	fmt.Printf("tf=%v files=%d\n", st.IsLoaded, len(st.Files))
