@@ -5,7 +5,7 @@ export default ({ command }: { command: string }) => ({
   identifier: "com.codie.musicplayer",
   slug: "codie-music-player",
   // version tracks upstream: plugins check minAppVersion against it
-  version: "0.1.26",
+  version: "0.1.27",
   out: "build",
   urlSchemes: [command === "dev" ? "codie-music-player-dev" : "codie-music-player"],
   macos: {
