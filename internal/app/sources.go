@@ -65,6 +65,9 @@ type library struct {
 	// ErrSetup, and asked says the listener was already taken there once.
 	needsSignIn, needsSetup bool
 	askedSignIn, askedSetup bool
+	// askedPrograms says a play that wanted its programs already asked about
+	// them, so the next one doesn't ask again without a change.
+	askedPrograms bool
 	// setupReason is what the source said it needs setting up for, if it did.
 	setupReason string
 
@@ -278,9 +281,21 @@ func (a *app) actionFailed(lib *library, err error, msg string) {
 // sourceFailed hears from the player that a source wants something of the
 // listener before it plays.
 func (a *app) sourceFailed(source string, err error) {
-	if lib := a.libOf(source); lib != nil {
-		a.problem(lib, err, T("Couldn't play this song"))
+	lib := a.libOf(source)
+	if lib == nil {
+		return
 	}
+	// A play that can't start its programs asks about them outright: the
+	// song is what they're wanted for. Not allowing still says the source
+	// needs setting up, for its page and settings, without taking them
+	// there; anything else goes the usual way, which does.
+	if errors.Is(err, music.ErrSetup) {
+		lib.needsSetup, lib.setupReason = true, music.Reason(err)
+		if a.askPrograms(lib) {
+			return
+		}
+	}
+	a.problem(lib, err, T("Couldn't play this song"))
 }
 
 // libraryChanged shows what changed in a source that says so, as files found

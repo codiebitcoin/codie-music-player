@@ -756,7 +756,7 @@ func (a *app) pluginPermissions(c *ui.Context, lib *library, g guarded, p palett
 			label = T("Stop Allowing")
 		}
 		if ui.Button(c.Key("grant"), label).Clicked() {
-			a.grantPrograms(lib, g, !granted)
+			a.grantPrograms(lib, g, !granted, nil)
 		}
 	})
 }
@@ -770,9 +770,45 @@ func programsWarning(programs plugin.Programs) string {
 	return Tf("This plugin wants to start %s, which can do anything you can. Only allow it if you trust it.", strings.Join(programs, ", "))
 }
 
+// confirmPrograms asks the listener with a native dialog whether to let a
+// plugin start its programs, on a goroutine, for it blocks, calling yes if
+// they say so; tests replace it.
+var confirmPrograms = func(a *app, o mygo.MessageOptions, yes func()) {
+	go func() {
+		res, err := mygo.Dialog.Message(o)
+		if err == nil && res.Button == 1 {
+			a.post(yes)
+		}
+	}()
+}
+
+// askPrograms asks whether to let a source that couldn't play without its
+// programs start them, and grants and plays the song again if they allow. It
+// says whether it asked, for the caller to go on the usual way when it
+// didn't: the source has no programs to allow, they're allowed already, or a
+// play has asked about this failing setup already.
+func (a *app) askPrograms(lib *library) bool {
+	g, ok := lib.src.(guarded)
+	if !ok || len(g.Permissions().Process) == 0 || g.Granted() || lib.askedPrograms {
+		return false
+	}
+	lib.askedPrograms = true
+	confirmPrograms(a, mygo.MessageOptions{
+		Type:          mygo.MessageWarning,
+		Message:       Tf("%s wants to start programs to play", lib.name()),
+		Detail:        programsWarning(g.Permissions().Process),
+		Buttons:       []string{T("Don't Allow"), T("Allow")},
+		DefaultButton: 1,
+	}, func() {
+		a.grantPrograms(lib, g, true, func() { a.pl.TogglePlay() })
+	})
+	return true
+}
+
 // grantPrograms changes the choice off the main thread, as the plugin starts
-// over for it, and has the source load again with what it can do now.
-func (a *app) grantPrograms(lib *library, g guarded, on bool) {
+// over for it, and has the source load again with what it can do now, then
+// runs after, which may play the song that wanted them.
+func (a *app) grantPrograms(lib *library, g guarded, on bool, after func()) {
 	go func() {
 		err := g.Grant(on)
 		a.post(func() {
@@ -782,7 +818,11 @@ func (a *app) grantPrograms(lib *library, g guarded, on bool) {
 			}
 			// Starting programs may be what it needed setting up for.
 			lib.needsSetup, lib.askedSetup, lib.setupReason = false, false, ""
+			lib.askedPrograms = false
 			a.libraryChanged(lib)
+			if after != nil {
+				after()
+			}
 		})
 	}()
 }

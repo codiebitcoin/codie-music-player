@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"mygo-music/internal/plugin"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,10 +15,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
 	"mygo-music/internal/i18n"
 	"mygo-music/internal/music"
+	"mygo-music/internal/player"
 )
 
 // addOther adds a second source, called Other, whose pages and sidebar a test
@@ -627,6 +631,114 @@ func TestErrSetupSaysWhy(t *testing.T) {
 	settings.Frame()
 	if _, ok := settings.Find("Fill in Region for it to work"); !ok {
 		t.Errorf("the settings don't name the empty field: %q", settings.Texts())
+	}
+}
+
+// programsSource is a fakeSource that can't play until its programs are
+// allowed, as the Spotify and YouTube Music plugins can't: they start
+// ffmpeg and yt-dlp to play, which the listener has to allow first.
+type programsSource struct {
+	*fakeSource
+	process []string
+	granted atomic.Bool
+}
+
+func (s *programsSource) Permissions() plugin.Permissions {
+	return plugin.Permissions{Process: s.process}
+}
+
+func (s *programsSource) Granted() bool { return s.granted.Load() }
+
+func (s *programsSource) Grant(on bool) error {
+	s.granted.Store(on)
+	return nil
+}
+
+// A play that can't start its programs asks about them with a dialog, and
+// allowing it grants them and plays the song again. Spotify had swapped for a
+// plugin of another id, which lost the grant, and every play then only said
+// the plugin needed setting up, once taking them to settings where the button
+// for it was easy to miss.
+func TestPlayWithoutProgramsAsks(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("the song"))
+	}))
+	defer srv.Close()
+	a := newTestApp()
+	ch := posts(a)
+	a.pl = player.New(a.post)
+	a.pl.Source = a.sourceByID
+	a.pl.Failed = a.sourceFailed
+	var opens, plays atomic.Int32
+	real := confirmPrograms
+	confirmPrograms = func(_ *app, o mygo.MessageOptions, yes func()) {
+		opens.Add(1)
+		if o.Message != "Spotify wants to start programs to play" {
+			t.Errorf("the dialog says %q", o.Message)
+		}
+		yes()
+	}
+	defer func() { confirmPrograms = real }()
+	src := &programsSource{fakeSource: newFakeSource("spotify"), process: []string{"ffmpeg"}}
+	src.info.Name = "Spotify"
+	src.stream = func(id, quality string) (*music.Stream, error) {
+		if !src.granted.Load() {
+			return nil, music.Fail(music.ErrSetup, "Allow Spotify to start programs in its settings")
+		}
+		plays.Add(1)
+		return &music.Stream{URL: srv.URL, Type: "mp3"}, nil
+	}
+	lib := addFake(a, src)
+	tr := song("1", "Song")
+	tr.Source = "spotify"
+	a.pl.PlayQueue([]music.Track{tr}, 0)
+	// The play fails for the programs, the dialog grants them, and the song
+	// is played again.
+	until(t, ch, func() bool { return plays.Load() > 0 })
+	if opens.Load() != 1 {
+		t.Errorf("asked %d times", opens.Load())
+	}
+	if !src.granted.Load() {
+		t.Error("it wasn't granted")
+	}
+	if lib.needsSetup || lib.askedPrograms {
+		t.Error("the setup need stays")
+	}
+}
+
+// Not allowing the programs still says the source needs setting up, but the
+// next play that fails for them doesn't ask again.
+func TestPlayWithoutProgramsAsksOnce(t *testing.T) {
+	a := newTestApp()
+	ch := posts(a)
+	a.pl = player.New(a.post)
+	a.pl.Source = a.sourceByID
+	a.pl.Failed = a.sourceFailed
+	var opens atomic.Int32
+	real := confirmPrograms
+	confirmPrograms = func(_ *app, _ mygo.MessageOptions, _ func()) { opens.Add(1) }
+	defer func() { confirmPrograms = real }()
+	src := &programsSource{fakeSource: newFakeSource("spotify"), process: []string{"ffmpeg"}}
+	src.stream = func(id, quality string) (*music.Stream, error) {
+		return nil, music.Fail(music.ErrSetup, "Allow Spotify to start programs in its settings")
+	}
+	lib := addFake(a, src)
+	lib.askedSetup = true // opening the settings takes a real app
+	tr := song("1", "Song")
+	tr.Source = "spotify"
+	a.pl.PlayQueue([]music.Track{tr}, 0)
+	until(t, ch, func() bool { return opens.Load() > 0 })
+	if !lib.needsSetup {
+		t.Error("doesn't need setting up")
+	}
+
+	// Another song failing the same way fails without asking again.
+	tr2 := song("2", "Another")
+	tr2.Source = "spotify"
+	a.pl.PlayQueue([]music.Track{tr2}, 0)
+	until(t, ch, func() bool { return a.pl.Current() != nil && a.pl.Current().ID == "2" && a.pl.Err() != "" })
+	if opens.Load() != 1 {
+		t.Errorf("asked %d times", opens.Load())
 	}
 }
 
