@@ -13,6 +13,11 @@
 // it doesn't do. A plugin that throws an error with a code of signIn, setup,
 // unavailable or unsupported says that of what was asked.
 //
+// A plugin of videos exports videoSearch, videoItem and videoPlay, and may
+// export videoHome and videoBrowse besides, by the names of video.VideoSource's
+// of package internal/video. One whose plugin.json says "kind": "video" is a
+// source of videos alone; a music plugin may export them too, and be both.
+//
 // A plugin reaches nothing but the JavaScript standard library, timers and the
 // host global, unless it asks: fetch reaches the hosts its network permission
 // names, and host.spawn, for those with the process permission that the
@@ -126,12 +131,22 @@ func (ps Programs) Allows(dir, command string) bool {
 type Manifest struct {
 	music.Info
 	Main string `json:"main,omitempty"`
+	// Kind is what the plugin is: music (also the default) is a source of
+	// songs, and video a source of videos alone, which shows in the video
+	// window, not among the sources of music. A music plugin that also
+	// exports the video functions is both, whatever its kind says.
+	Kind string `json:"kind,omitempty"`
 	// MinAppVersion is the oldest version of the app the plugin works with,
 	// such as 0.1.8. An older one won't install it, or load it.
 	MinAppVersion  string           `json:"minAppVersion,omitempty"`
 	Permissions    Permissions      `json:"permissions"`
 	RequestHeaders []RequestHeaders `json:"requestHeaders,omitempty"`
 }
+
+// Kinds of plugin, as plugin.json's kind says.
+const (
+	KindMusic = "music"
+)
 
 // appVersion is the app's version, which the app sets. With none, as when
 // it's built for development, any plugin loads.
@@ -205,6 +220,11 @@ func Load(dir, dataDir string) (*Plugin, error) {
 	}
 	if m.Playback == "" {
 		m.Playback = music.PlaybackStream
+	}
+	switch m.Kind {
+	case "", KindMusic, KindVideo:
+	default:
+		return nil, fmt.Errorf("%s: kind is music or video, not %q", dir, m.Kind)
 	}
 	if m.Main == "" {
 		m.Main = "index.js"
@@ -667,6 +687,19 @@ func (p *Plugin) Info() music.Info {
 // Can reports whether the plugin exports the function. It's known from
 // compiling it, without running anything, so the views can ask at any time.
 func (p *Plugin) Can(what string) bool { return p.exports[what] }
+
+// VideoOnly says whether the plugin is a source of videos alone: it shows in
+// the video window, and not among the sources of music.
+func (p *Plugin) VideoOnly() bool { return p.manifest.Kind == KindVideo }
+
+// Video is the plugin as a source of videos, or nil if it doesn't do that: a
+// video source plays what videoSearch finds through videoItem and videoPlay.
+func (p *Plugin) Video() *VideoSource {
+	if p.exports["videoSearch"] && p.exports["videoItem"] && p.exports["videoPlay"] {
+		return &VideoSource{p}
+	}
+	return nil
+}
 
 func (p *Plugin) Setting(key string) string {
 	p.mu.Lock()

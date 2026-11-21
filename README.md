@@ -1,5 +1,7 @@
 # Codie Music Player
 
+GitHub：https://github.com/codiebitcoin/codie-music-player
+
 [mygo-music](https://music.egoist.dev/)（by egoist）的 fork：完整的原生音乐播放器，
 四音源插件（网易云 / QQ 音乐 / Bilibili / Spotify），外加 **codie 输出** ——
 任何流媒体音源的歌曲都可以推到 codie 设备（TF 卡 + 音乐 API）播放。

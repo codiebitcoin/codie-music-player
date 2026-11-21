@@ -3,6 +3,7 @@ package plugin
 import (
 	"bufio"
 	"crypto/aes"
+	"crypto/cipher"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -605,6 +607,34 @@ export function suggest() {
 	block.Encrypt(out, want)
 	if got[1] != hex.EncodeToString(out) {
 		t.Errorf("aes: %s, want %x", got[1], out)
+	}
+}
+
+// The CBC decrypt gives the blocks back exactly, as the sites that keep their
+// pictures encrypted under a key they publish ask.
+func TestCryptoCbcDecrypt(t *testing.T) {
+	block, _ := aes.NewCipher([]byte("0123456789abcdef"))
+	iv := []byte("ijklmnopqrstuvwx")
+	message := []byte("abcdefghijklmnop")
+	enc := make([]byte, 16)
+	cipher.NewCBCEncrypter(block, iv).CryptBlocks(enc, message)
+	list := make([]string, len(enc))
+	for i, b := range enc {
+		list[i] = strconv.Itoa(int(b))
+	}
+	p := load(t, plain, `
+export function suggest() {
+  const key = new TextEncoder().encode("0123456789abcdef");
+  const iv = new TextEncoder().encode("ijklmnopqrstuvwx");
+  const out = host.crypto.aesCbcDecrypt(key, iv, new Uint8Array([`+strings.Join(list, ",")+`]));
+  return [[...new Uint8Array(out)].map((n) => n.toString(16).padStart(2, "0")).join("")];
+}`)
+	got, err := p.Suggest("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := hex.EncodeToString(message); got[0] != want {
+		t.Errorf("cbc: %s, want %s", got[0], want)
 	}
 }
 

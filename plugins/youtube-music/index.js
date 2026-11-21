@@ -1039,3 +1039,87 @@ export async function stream({ id, quality }) {
     gain: source.gain,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Videos, in the video window. A video plays with its picture on, so an
+// episode comes whole, as one mp4 yt-dlp joins and keeps in the plugin's
+// data: a video the app shows can't start from a stream that's still coming,
+// as its audio does through ffmpeg.
+
+// What a search of YouTube's videos found, asked of the plain web client,
+// which answers them as compact rows this source reads.
+export async function videoSearch({ query, offset }) {
+  if (offset > 0) return { items: [], more: false };
+  const answer = await call("search", { query, params: decodeURIComponent("EgIQAQ%3D%3D") }, visionOS(await visitorData()));
+  const found = await withDurations(ofKind(rowsOf(answer).items, "track"));
+  return {
+    items: found.map((v) => ({
+      id: v.id,
+      title: v.name,
+      cover: v.album?.imageUrl || "",
+      subtitle: v.artists.map((a) => a.name).join(", "),
+    })),
+    more: false,
+  };
+}
+
+// videoItem is a video, and its one episode.
+export async function videoItem({ id }) {
+  const r = await call("player", { videoId: id, contentCheckOk: true, racyCheckOk: true }, visionOS(await visitorData()));
+  const status = r.playabilityStatus || {};
+  if (status.status === "UNPLAYABLE" || status.status === "ERROR") {
+    throw fail("unavailable", status.reason || t("YouTube listed no audio to play as it is"));
+  }
+  const vd = r.videoDetails || {};
+  const title = vd.title || id;
+  const thumbs = vd.thumbnail?.thumbnails || [];
+  return {
+    id,
+    title,
+    cover: thumbs.length ? thumbs[thumbs.length - 1].url : "",
+    subtitle: vd.author || "",
+    intro: (vd.shortDescription || "").slice(0, 400),
+    episodes: [{ id, title, duration: (+vd.lengthSeconds || 0) * 1000 }],
+  };
+}
+
+// videoPlay is what an episode plays through. The last one's file goes
+// before this one comes, for the data keeps no more than it plays.
+const videoDir = "videos";
+
+export async function videoPlay({ id }) {
+  const ytdlp = await program("yt-dlp", "--version");
+  if (!ytdlp) {
+    throw fail("setup", t("YouTube Music plays through yt-dlp: install it with Homebrew, or so that it's on the PATH"));
+  }
+  host.removeDataDir(videoDir);
+  const args = [
+    "--config-locations", "-",
+    "--no-warnings", "--no-playlist", "--no-progress",
+    "--format", "bv*[ext=mp4][vcodec!^=av01]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
+    "--merge-output-format", "mp4",
+    "--force-overwrites", "--no-part",
+    "--print", "after_move:filepath",
+  ];
+  for (const runtime of ["deno", "node", "bun"]) {
+    const path = await program(runtime, "--version");
+    if (path) {
+      args.push("--js-runtimes", `${runtime}:${path}`);
+      break;
+    }
+  }
+  args.push(`https://www.youtube.com/watch?v=${id}`);
+
+  const proc = host.spawn(ytdlp, args);
+  proc.write(ytdlpConfig());
+  proc.closeStdin();
+  const timer = setTimeout(() => proc.kill(), 10 * 60 * 1000);
+  const lines = [];
+  for (let line; (line = await proc.readLine()) !== null; ) lines.push(line);
+  const code = await proc.wait();
+  clearTimeout(timer);
+  if (code !== 0) throw ytdlpFailure(proc.errorOutput());
+  const file = lines[lines.length - 1];
+  if (!file) throw fail("unavailable", t("YouTube listed no audio to play as it is"));
+  return { url: new URL("file://" + file.trim().replace(/\\/g, "/")).href, type: "mp4" };
+}

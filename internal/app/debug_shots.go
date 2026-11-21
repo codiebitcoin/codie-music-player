@@ -49,6 +49,37 @@ func init() {
 				time.Sleep(2 * time.Second)
 				shot("4-queue", a.win)
 			}
+			// The window of the sources of videos, when there's one on: its
+			// first page as it loaded, and an episode really playing.
+			if len(a.videoLibs) > 0 {
+				step(0, func() { a.openVideoWindow() })
+				time.Sleep(3 * time.Second)
+				if a.videoWin != nil {
+					shot("5-videos", a.videoWin)
+					step(0, func() {
+						for _, lib := range a.videoLibs {
+							if lib.id == "bilibili" {
+								a.videoUse(lib)
+							}
+						}
+						a.videoSearch("mixingjiao") // 迷星叫, romanized: no Chinese in code outside the catalogs
+					})
+					time.Sleep(4 * time.Second)
+					step(0, func() {
+						if d := a.video.search; d != nil && len(d.items) > 0 {
+							a.videoOpenItem(d.items[0])
+						}
+					})
+					time.Sleep(2 * time.Second)
+					step(0, func() {
+						if d := a.video.item; d != nil && d.video != nil && len(d.video.Episodes) > 0 {
+							a.videoPlayEpisode(d.video.Item, d.video.Episodes[0], 0)
+						}
+					})
+					time.Sleep(20 * time.Second)
+					shot("6-video-playing", a.videoWin)
+				}
+			}
 			mygo.RunOnMain(mygo.App.Quit)
 		}()
 	}

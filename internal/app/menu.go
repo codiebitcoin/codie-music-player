@@ -2,6 +2,7 @@ package app
 
 import (
 	"runtime"
+	"slices"
 
 	"github.com/egoist/mygo"
 )
@@ -23,6 +24,10 @@ func (a *app) setMenu() {
 		mygo.Separator(),
 		{Label: T("Settings…"), Accelerator: "CmdOrCtrl+,", Click: run(a.openSettings)},
 		mygo.Separator(),
+	}
+	// Videos opens the window of the sources of videos, when there's one on.
+	if len(a.videoLibs) > 0 {
+		appMenu = slices.Insert(appMenu, 3, &mygo.MenuItem{Label: T("Videos…"), Click: run(a.openVideoWindow)})
 	}
 	// Services and hiding are macOS's alone. Elsewhere MyGo leaves their
 	// items out but keeps the separators around them, which then stack.

@@ -1445,3 +1445,94 @@ export async function stream({ id, quality }) {
   }
   throw lastError;
 }
+
+// ---------------------------------------------------------------------------
+// Videos, in the video window. A video plays with its picture on, through
+// ffmpeg: its picture and sound come apart in DASH, and the app joins them,
+// with the headers the CDN wants on every fetch.
+
+// How long a video runs, as a card says it.
+function mmss(s) {
+  s = Math.floor(s || 0);
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+// videoSearch is what a search of Bilibili's videos found, under its own
+// kind, so a search of songs isn't disturbed.
+export async function videoSearch({ query: q, offset }) {
+  const { found, more } = await searchPages("videos", q, offset, "video", (r) => r.bvid);
+  return {
+    items: found.map((r) => ({
+      id: r.bvid,
+      title: clean(r.title),
+      cover: image(r.pic),
+      subtitle: `${clean(r.author)} · ${mmss(r.duration)}`,
+    })),
+    more,
+  };
+}
+
+// videoItem is a video and its parts, a part an episode of the window's,
+// named and numbered as the tracks of it are.
+export async function videoItem({ id }) {
+  const v = await view(splitId(id).bvid);
+  const pages = v.pages || [];
+  const episodes = pages.map((p, i) => ({
+    id: p.page > 1 ? `${v.bvid}|${p.cid}` : v.bvid,
+    title: pages.length > 1 ? `P${p.page || i + 1} ${clean(p.part)}` : clean(v.title),
+    duration: seconds(p.duration || 0),
+  }));
+  return {
+    id: v.bvid,
+    title: clean(v.title),
+    cover: image(v.pic),
+    subtitle: clean(v.owner?.name || ""),
+    intro: clean(v.desc || ""),
+    episodes,
+  };
+}
+
+// videoPlay is what an episode plays through: the best picture there is but
+// Dolby Vision, which nothing here reads, and its sound, at two addresses
+// the app fetches with the headers the CDN asks for.
+export async function videoPlay({ id, episode }) {
+  const where = await locate(episode || id);
+  const params = { bvid: where.bvid, cid: where.cid, fnval: 16, fourk: 1, fnver: 0 };
+  let d;
+  try {
+    d = await get("/x/player/wbi/playurl", params, { wbi: true });
+  } catch (e) {
+    if (e.code === "unavailable" || e.code === "signIn") throw e;
+    d = await get("/x/player/playurl", params);
+  }
+  const dash = d.dash;
+  if (!dash) throw fail("unavailable", t("Bilibili has no video for this video"));
+  const best = (list) =>
+    (list || [])
+      .filter((x) => (x.baseUrl || x.base_url) && !/^dv/i.test(x.codecs || ""))
+      .sort((a, b) => b.bandwidth - a.bandwidth)[0];
+  // As audioOf keeps its mirrors: one address to a host, the upos ones first,
+  // for the peer-to-peer caches among the mirrors often stall.
+  const mirrors = (a) => {
+    const hosts = new Set();
+    return [a.baseUrl || a.base_url, ...(a.backupUrl || a.backup_url || [])]
+      .filter((url) => {
+        if (!url) return false;
+        const { host } = new URL(url);
+        if (hosts.has(host)) return false;
+        hosts.add(host);
+        return true;
+      })
+      .sort((x, y) => /mcdn|szbdyd/.test(x) - /mcdn|szbdyd/.test(y));
+  };
+  const picture = best(dash.video);
+  if (!picture) throw fail("unavailable", t("Bilibili has no video for this video"));
+  const sound = best(dash.audio);
+  const headers = { Referer: REFERER, "User-Agent": UA };
+  return {
+    url: await playableMirror(mirrors(picture), headers),
+    audioUrl: sound ? await playableMirror(mirrors(sound), headers) : "",
+    type: "mp4",
+    headers,
+  };
+}

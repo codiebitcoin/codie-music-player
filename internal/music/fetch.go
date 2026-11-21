@@ -1,6 +1,7 @@
 package music
 
 import (
+	"encoding/base64"
 	"errors"
 	"io"
 	"net/http"
@@ -50,10 +51,15 @@ const placeholderSize = 600
 // as a source gives it or escaped, as a URL parsed and written again has it.
 var sizePlaceholder = regexp.MustCompile(`\{size\}|%7[Bb]size%7[Dd]`)
 
-// Fetch returns what's at url, of the web or a file://, such as a cover.
+// Fetch returns what's at url, of the web, a file://, or a data:, such as a
+// cover. A source hands a data: over for a picture it had to make whole
+// itself, as one that came encrypted.
 func Fetch(u string) ([]byte, error) {
 	if path, ok := PathOf(u); ok {
 		return os.ReadFile(path)
+	}
+	if data, ok := DataOf(u); ok {
+		return data, nil
 	}
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
@@ -125,4 +131,21 @@ func PathOf(u string) (string, bool) {
 		path = strings.TrimPrefix(path, "/")
 	}
 	return filepath.FromSlash(path), true
+}
+
+// DataOf returns the bytes a base64 data: URL holds, and whether u is one.
+func DataOf(u string) ([]byte, bool) {
+	rest, ok := strings.CutPrefix(u, "data:")
+	if !ok {
+		return nil, false
+	}
+	head, payload, ok := strings.Cut(rest, ",")
+	if !ok || !strings.Contains(strings.ToLower(head), "base64") {
+		return nil, false
+	}
+	data, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		return nil, false
+	}
+	return data, true
 }

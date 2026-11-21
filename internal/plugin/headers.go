@@ -29,7 +29,7 @@ type RequestHeaders struct {
 	// names, such as https://nas.local:5666. Each has to be one the network
 	// permission reaches, and * isn't one: headers go to hosts named.
 	Hosts []string `json:"hosts"`
-	// Kinds are what it's for, image or audio, and both without it.
+	// Kinds are what it's for, image, audio or video, and all without it.
 	Kinds   []string          `json:"kinds,omitempty"`
 	Headers map[string]string `json:"headers"`
 }
@@ -38,6 +38,7 @@ type RequestHeaders struct {
 const (
 	KindImage = "image"
 	KindAudio = "audio"
+	KindVideo = "video"
 )
 
 var placeholder = regexp.MustCompile(`\{(setting|storage):([^{}]+)\}`)
@@ -50,8 +51,8 @@ func checkRequestHeaders(m *Manifest) error {
 			return fmt.Errorf("requestHeaders[%d] needs hosts and headers", i)
 		}
 		for _, k := range r.Kinds {
-			if k != KindImage && k != KindAudio {
-				return fmt.Errorf("requestHeaders[%d]: kind %q isn't image or audio", i, k)
+			if k != KindImage && k != KindAudio && k != KindVideo {
+				return fmt.Errorf("requestHeaders[%d]: kind %q isn't image, audio or video", i, k)
 			}
 		}
 		for _, h := range r.Hosts {

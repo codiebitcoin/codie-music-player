@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/aes"
+	"crypto/cipher"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
@@ -140,6 +141,31 @@ func (p *Plugin) installHost(v *vm) error {
 					return moejs.Undefined(), err
 				}
 				return moejs.String(hex.EncodeToString(out)), nil
+			}),
+			// aesCbcDecrypt takes a key, an IV and encrypted bytes, each a
+			// typed array, and answers the blocks decrypted, without taking
+			// any padding off: sites that keep their pictures encrypted under
+			// a key they publish ask for exactly that.
+			"aesCbcDecrypt": moejs.NativeFunc(func(_ *moejs.Realm, _ moejs.Value, args []moejs.Value) (moejs.Value, error) {
+				var key, iv, data []byte
+				if err := v.rt.ToGoInto(moejs.Arg(args, 0), &key); err != nil {
+					return moejs.Undefined(), err
+				}
+				if err := v.rt.ToGoInto(moejs.Arg(args, 1), &iv); err != nil {
+					return moejs.Undefined(), err
+				}
+				if err := v.rt.ToGoInto(moejs.Arg(args, 2), &data); err != nil {
+					return moejs.Undefined(), err
+				}
+				out, err := aesCBC(key, iv, data)
+				if err != nil {
+					return moejs.Undefined(), err
+				}
+				val, err := v.rt.FromGo(out)
+				if err != nil {
+					return moejs.Undefined(), err
+				}
+				return val, nil
 			}),
 		},
 		"removeDataDir": moejs.NativeFunc(func(_ *moejs.Realm, _ moejs.Value, args []moejs.Value) (moejs.Value, error) {
@@ -458,6 +484,25 @@ func aesECB(key, text []byte) ([]byte, error) {
 	for i := 0; i < len(text); i += aes.BlockSize {
 		block.Encrypt(out[i:i+aes.BlockSize], text[i:i+aes.BlockSize])
 	}
+	return out, nil
+}
+
+// aesCBC decrypts bytes as AES in CBC mode, taking no padding off: what
+// comes out is exactly the blocks. A picture decrypted to one that starts
+// with its format's marks says the key was right.
+func aesCBC(key, iv, text []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	if len(iv) != aes.BlockSize {
+		return nil, errors.New("the IV isn't 16 bytes")
+	}
+	if len(text) == 0 || len(text)%aes.BlockSize != 0 {
+		return nil, errors.New("the encrypted bytes aren't whole blocks")
+	}
+	out := make([]byte, len(text))
+	cipher.NewCBCDecrypter(block, iv).CryptBlocks(out, text)
 	return out, nil
 }
 

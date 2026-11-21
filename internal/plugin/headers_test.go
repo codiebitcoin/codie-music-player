@@ -81,7 +81,7 @@ func TestRequestHeadersStayInPermission(t *testing.T) {
 	for manifest, want := range map[string]string{
 		`{"id":"x","permissions":{"network":["api.example.com"]},"requestHeaders":[{"hosts":["cdn.example.com"],"headers":{"a":"b"}}]}`: "outside the network permission",
 		`{"id":"x","permissions":{"network":["*"]},"requestHeaders":[{"hosts":["*"],"headers":{"a":"b"}}]}`:                             "isn't a host",
-		`{"id":"x","permissions":{"network":["*"]},"requestHeaders":[{"hosts":["a.com"],"kinds":["video"],"headers":{"a":"b"}}]}`:       "isn't image or audio",
+		`{"id":"x","permissions":{"network":["*"]},"requestHeaders":[{"hosts":["a.com"],"kinds":["film"],"headers":{"a":"b"}}]}`:       "isn't image, audio or video",
 		`{"id":"x","permissions":{"network":["*"]},"requestHeaders":[{"hosts":["a.com"],"headers":{"Host":"b"}}]}`:                      "isn't a header it can set",
 	} {
 		dir, data := write(t, manifest, `export function home() { return {}; }`)

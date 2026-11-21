@@ -42,6 +42,10 @@ Releases are built by [`.github/workflows/release.yml`](.github/workflows/releas
 
    This runs `vite build && wrangler deploy` in `website/`, and needs Wrangler signed in to the Cloudflare account (`bunx wrangler login`).
 
+## Publish to the CodieHub Workshop
+
+To also publish the release to the Workshop on [codiehub.com](https://codiehub.com) (its app store), follow [`docs/workshop-release.md`](docs/workshop-release.md) — packaging the resource/source zips, the two-step upload form, and updating an already published work.
+
 ## Secrets
 
 The workflow needs these repository secrets:
