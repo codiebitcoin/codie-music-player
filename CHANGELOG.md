@@ -2,6 +2,17 @@
 
 All notable changes to MyGo Music are written down here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.1.29] - 2026-11-25
+
+### Added
+
+- A web app: the same sources as a server, with the pages drawn in the browser. It ships as a Docker image, `ghcr.io/codiebitcoin/codie-music-player`, with ffmpeg and yt-dlp in it.
+
+### Fixed
+
+- The first launch on Windows installs the sources the app ships: NetEase Cloud Music, QQ Music, Bilibili, YouTube Music and Spotify. Their files were in the app, but it looked for them with a Windows path, so none of them was copied out and only local files were left to choose from.
+- The Codie status in Settings, while pairing and while clearing the device's songs, follows the language the app is shown in, instead of staying in the language it was first checked in.
+
 ## [0.1.28] - 2026-11-25
 
 ### Changed
@@ -270,6 +281,7 @@ All notable changes to MyGo Music are written down here. Versions follow [Semant
 
 The first release: a native music player that plays your local files and gets everything else from plugins.
 
+[0.1.29]: https://github.com/codiebitcoin/codie-music-player/compare/v0.1.28...v0.1.29
 [0.1.28]: https://github.com/codiebitcoin/codie-music-player/compare/v0.1.27...v0.1.28
 [0.1.27]: https://github.com/codiebitcoin/codie-music-player/compare/v0.1.26...v0.1.27
 [0.1.26]: https://github.com/codiebitcoin/codie-music-player/compare/v0.1.25...v0.1.26
