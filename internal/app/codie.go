@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/ui"
 
 	"mygo-music/internal/codieout"
 	"mygo-music/internal/music"
@@ -32,6 +34,76 @@ var requestPairing = func(addr string) (string, error) {
 // scanCodieDevices looks for codie devices on the network; tests replace it.
 var scanCodieDevices = func() ([]codieout.Device, error) {
 	return codieout.Scan(context.Background())
+}
+
+// codiePoll is how often the paired device is asked how it is, for the
+// sidebar's row: the device answers in a moment on the same network.
+const codiePoll = 30 * time.Second
+
+// codieProbeNow asks the paired device how it is, off the main thread, and
+// keeps the answer for the sidebar's row. Main thread only.
+func (a *app) codieProbeNow() {
+	if a.settings.Codie == nil {
+		return
+	}
+	c := a.codieClient()
+	if c == nil {
+		return
+	}
+	go func() {
+		state := "offline"
+		if st, err := c.MusicStorage(); err == nil {
+			state = "no-card"
+			if st.IsLoaded {
+				state = "online"
+			}
+		}
+		a.post(func() {
+			a.codieState = state
+		})
+	}()
+}
+
+// codieWatch keeps that row fresh: asked at first, then every codiePoll, for
+// as long as the app runs, so a device paired later needs no start of its own.
+func (a *app) codieWatch() {
+	for {
+		time.Sleep(codiePoll)
+		mygo.RunOnMain(a.codieProbeNow)
+	}
+}
+
+// codieRow says how the paired device is, at the sidebar's foot: a dot in its
+// state's color and what it says, which opens the Codie settings.
+func (a *app) codieRow(c *ui.Context) {
+	if a.settings.Codie == nil {
+		return
+	}
+	p := a.pal
+	// Green for a device that answers, amber for one whose card isn't in,
+	// faint for one that doesn't answer: the accent is the app's, and says
+	// nothing of how a device is.
+	dot, said := p.faint, T("Offline")
+	switch a.codieState {
+	case "online":
+		dot, said = ui.Hex("#2fb457"), T("Online")
+	case "no-card":
+		dot, said = ui.Hex("#d99324"), T("No card")
+	}
+	b := ui.ButtonBase(c.Key("codie-state")).Height(34).PaddingX(8).Gap(8).Radius(8).AlignItems(ui.Center).
+		Justify(ui.Start).FocusRing(false).Label(T("Codie device"))
+	if b.Hovered() {
+		b.Background(p.hover)
+	}
+	b.Children(func() {
+		ui.Box(c).Size(7, 7).Radius(4).Background(dot)
+		ui.Text(c, "Codie").FontSize(12.5).FontWeight(500).TextColor(p.text).Shrink(0)
+		ui.Text(c, " · "+said).FontSize(12).TextColor(p.muted).SingleLine().Shrink(1).MinWidth(0)
+	})
+	if b.Clicked() {
+		a.settingsPage = "codie"
+		a.openSettings()
+	}
 }
 
 // codieClient answers the paired device's client, or nil.

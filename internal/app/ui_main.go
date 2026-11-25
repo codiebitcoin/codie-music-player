@@ -239,6 +239,7 @@ func (a *app) sidebar(c *ui.Context) {
 			}
 		})
 
+		a.codieRow(c)
 		a.accountRow(c)
 	})
 }

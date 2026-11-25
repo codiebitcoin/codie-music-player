@@ -18,8 +18,8 @@ import (
 	"mygo-music/internal/local"
 	"mygo-music/internal/music"
 	"mygo-music/internal/player"
-	"mygo-music/internal/proxy"
 	"mygo-music/internal/plugin"
+	"mygo-music/internal/proxy"
 )
 
 type pageKind int
@@ -78,7 +78,8 @@ type app struct {
 	captions         captionState    // the episode playing's captions, and the model they take
 	installer        pluginInstaller // installing and updating plugins
 	codiePairing     codiePairState  // where the codie settings section is
-		codieStatus      string          // how the paired device is, fetched async, in English
+	codieState       string          // how the paired device is: online, no-card or offline, for the sidebar's row
+	codieStatus      string          // how the paired device is, fetched async, in English
 	codieStatusAsked bool            // the one-shot auto refresh of that
 	codieSongs       []CodieSong     // the device card's songs, for the long-press menu
 	codieSongsErr    string
@@ -408,7 +409,14 @@ func Run(bundledPlugins fs.FS) error {
 		// keep for minutes.
 		a.win.OnHide(func() { go debug.FreeOSMemory() })
 		// Shown or switched to a while after, it shows what's new.
-		a.win.OnFocus(a.freshenHome)
+		a.win.OnFocus(func() {
+			a.freshenHome()
+			// The device's state, for the sidebar's row: a focus is a moment
+			// the listener looks at the window, so it's worth asking.
+			a.codieProbeNow()
+		})
+		// The row's state stays fresh while the app runs, pairing later included.
+		go a.codieWatch()
 		a.applyTray()
 		for _, link := range a.links {
 			a.openLink(link)
