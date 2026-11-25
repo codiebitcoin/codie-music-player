@@ -1,0 +1,8 @@
+.git
+build
+data
+.zcode
+.playwright-mcp
+resources/*/bin
+front/node_modules
+front/dist

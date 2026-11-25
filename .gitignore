@@ -10,4 +10,10 @@ data/
 
 # The ffmpeg and yt-dlp each platform ships, fetched at build time.
 resources/*/bin/
+
+# The web app's dependencies and its build. The image builds them;
+# cmd/web/dist keeps a stand-in page so the server still compiles.
+front/node_modules/
+front/dist/
+cmd/web/dist/assets/
 third_party/go-qrcode/example_test.go

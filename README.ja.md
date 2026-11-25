@@ -40,6 +40,38 @@ go tool mygo build          # デスクトップアプリ。mygo.config.ts に�
 
 `go tool mygo build -platform darwin/arm64,windows/amd64,linux/amd64` で、一台のマシンから各プラットフォームをビルドできます。
 
+## ウェブ版
+
+同じソースをサーバーとしても動かせます。画面はブラウザに描かれます。デスクトップ版のウィンドウ（サイドバー、ホーム、検索、下部のプレーヤー）を HTTP 越しに出したもので、音はブラウザで鳴り、このマシンのスピーカーは使いません。独自のウィンドウでサインインするソースは、これまでどおりデスクトップ版でサインインします。両方を同じデータフォルダに向ければ、サインイン状態は共有されます。
+
+```bash
+cd front && npm install && npm run build && cd ..
+rm -rf cmd/web/dist && cp -R front/dist cmd/web/dist
+go run ./cmd/web -plugins ./plugins -data ./data   # http://127.0.0.1:8080
+```
+
+ログインは環境変数で決まります。どちらも未設定のときは、サーバーがパスワードを一つ作り、起動時に一度だけ表示します。
+
+| 変数 | 内容 |
+|---|---|
+| `AUTH_USER` | ユーザー名。未設定なら `codie` |
+| `AUTH_PASS` | パスワード。未設定なら自動で作り、ログに出します |
+| `LISTEN_ADDR` | 待ち受けアドレス。既定は `:8080` |
+| `DATA_DIR` | 設定とプラグインのデータ。既定は `data` |
+| `PLUGINS_DIR` | プラグインのフォルダ。既定は `plugins` |
+
+### Docker
+
+イメージは `ghcr.io/codiebitcoin/codie-music-player` です。単体で一度公開し、その後のリリースでも毎回公開します。ffmpeg と yt-dlp はイメージに入っているので、別に入れるものはありません。
+
+```bash
+docker build -t codie-music-player:local .
+cd deploy && cp env.example .env   # AUTH_USER と AUTH_PASS を設定
+docker compose up -d
+```
+
+`deploy/docker-compose.yml` はポート 8080 で待ち受け、データは `deploy/data` に保存します。
+
 ## 注意
 
 - プラグインは各サービス自身のウェブインターフェースを通して第三者のサービスに接続します。このプロジェクトは音楽を保存も配布もせず、NetEase、Tencent、Bilibili、Google、Spotify のいずれとも関係がありません。

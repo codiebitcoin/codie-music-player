@@ -40,6 +40,38 @@ go tool mygo build          # 桌面应用，按 mygo.config.ts
 
 `go tool mygo build -platform darwin/arm64,windows/amd64,linux/amd64` 在一台机器上打出各个平台。
 
+## 网页版
+
+同一批音源也可以跑成一个服务器，页面画在浏览器里。它是桌面版的窗口——侧边栏、首页、搜索和底部播放栏——走 HTTP，声音在浏览器里播放，不走这台机器自己的扬声器。需要弹出窗口才能登录的音源，仍在桌面版里登录；两边指向同一个数据目录时，登录状态是共用的。
+
+```bash
+cd front && npm install && npm run build && cd ..
+rm -rf cmd/web/dist && cp -R front/dist cmd/web/dist
+go run ./cmd/web -plugins ./plugins -data ./data   # http://127.0.0.1:8080
+```
+
+登录账号来自环境变量。两个都不设时，服务器会自己生成一个密码，并在启动时打印一次。
+
+| 变量 | 作用 |
+|---|---|
+| `AUTH_USER` | 用户名，不设时是 `codie` |
+| `AUTH_PASS` | 密码；不设就自动生成一个并写到日志 |
+| `LISTEN_ADDR` | 监听地址，默认 `:8080` |
+| `DATA_DIR` | 设置和插件数据，默认 `data` |
+| `PLUGINS_DIR` | 插件目录，默认 `plugins` |
+
+### Docker
+
+镜像是 `ghcr.io/codiebitcoin/codie-music-player`，单独发布一次，之后每次发版都会再发一次。ffmpeg 和 yt-dlp 已经在镜像里，不用另外安装。
+
+```bash
+docker build -t codie-music-player:local .
+cd deploy && cp env.example .env   # 设置 AUTH_USER 和 AUTH_PASS
+docker compose up -d
+```
+
+`deploy/docker-compose.yml` 监听 8080 端口，数据保存在 `deploy/data`。
+
 ## 说明
 
 - 插件通过各服务自己的网页接口访问第三方服务。本项目不存储、不分发它们的音乐，也与网易、腾讯、哔哩哔哩、Google 或 Spotify 无关。
