@@ -45,6 +45,10 @@ type settings struct {
 	// Quality is what's asked of sources: standard, high or lossless. A source
 	// may ignore it.
 	Quality string `json:"quality"`
+	// Proxy is the HTTP proxy sources' downloads go through, such as
+	// http://127.0.0.1:7897: ffmpeg and yt-dlp read it, as the app's own
+	// requests do. Empty for none.
+	Proxy string `json:"proxy,omitempty"`
 	// Appearance is light, dark, or system to follow the system.
 	Appearance string `json:"appearance"`
 	// GrowFromCover opens Now Playing out of the player bar's cover, and

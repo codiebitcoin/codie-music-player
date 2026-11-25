@@ -27,10 +27,17 @@ import (
 // The test binary is the program plugins start: with this set, it echoes lines.
 const echoEnv = "MYGO_MUSIC_TEST_ECHO"
 
+// With this set, it says the proxy its environment carries instead.
+const envEnv = "MYGO_MUSIC_TEST_ENV"
+
 func TestMain(m *testing.M) {
 	if os.Getenv(echoEnv) == "fail" {
 		fmt.Fprintln(os.Stderr, "the reason it stopped")
 		os.Exit(1)
+	}
+	if os.Getenv(envEnv) != "" {
+		fmt.Println("https_proxy=" + os.Getenv("https_proxy") + " no_proxy=" + os.Getenv("no_proxy"))
+		return
 	}
 	if os.Getenv(echoEnv) != "" {
 		sc := bufio.NewScanner(os.Stdin)

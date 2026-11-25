@@ -18,6 +18,7 @@ import (
 	"mygo-music/internal/local"
 	"mygo-music/internal/music"
 	"mygo-music/internal/player"
+	"mygo-music/internal/proxy"
 	"mygo-music/internal/plugin"
 )
 
@@ -106,6 +107,7 @@ type app struct {
 	dailySpin      spinState                    // the record on the feature card
 	dailyBars      barState                     // the bars on its play button
 	settingText    map[string]*string           // the settings of sources, as being typed
+	proxyText      *string                      // the HTTP proxy setting, as being typed
 	settingEdits   map[string]*settingEdit      // pending typed-setting saves, main thread only
 	settingSaves   map[*library]<-chan struct{} // source save order, main thread only
 	settingPending map[string]*settingWrite     // last queued value per source/key
@@ -347,6 +349,7 @@ func Run(bundledPlugins fs.FS) error {
 	mygo.App.WhenReady(func() {
 		a.settings = loadSettings()
 		a.settings.applyAppearance()
+		proxy.Apply(a.settings.Proxy)
 		i18n.SetLanguage(i18n.Resolve(a.settings.Language, systemLanguages()))
 		ensureBundledPlugins(bundledPlugins)
 		if !a.settings.CodieSetupDone {

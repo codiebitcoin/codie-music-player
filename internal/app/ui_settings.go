@@ -15,6 +15,7 @@ import (
 	"mygo-music/internal/local"
 	"mygo-music/internal/music"
 	"mygo-music/internal/plugin"
+	"mygo-music/internal/proxy"
 )
 
 // openSettings shows the settings window, opening it the first time.
@@ -411,6 +412,24 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 			if i, ok := choice(c, "quality", T("Quality"), labels, at); ok {
 				s.Quality = qualityLevels[i].level
 				a.changed()
+			}
+		})
+		row(T("HTTP Proxy"), T("Sources' downloads go through this proxy, which ffmpeg and yt-dlp read, as http://127.0.0.1:7897. Empty, they go where the network sends them."), func() {
+			if a.proxyText == nil {
+				v := s.Proxy
+				a.proxyText = &v
+			}
+			in := ui.TextInput(c.Key("proxy"), a.proxyText).Placeholder("http://127.0.0.1:7897").Label(T("HTTP Proxy")).FontSize(13).Width(240)
+			if in.Submitted() || !in.Focused() {
+				v := proxy.Normalize(*a.proxyText)
+				if v != s.Proxy {
+					s.Proxy = v
+					proxy.Apply(v)
+					a.changed()
+				}
+				if *a.proxyText != v {
+					*a.proxyText = v
+				}
 			}
 		})
 		if a.anyCan("comments") {
