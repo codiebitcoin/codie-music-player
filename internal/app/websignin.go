@@ -23,11 +23,22 @@ const (
 	signInPageFor = 5 * time.Minute
 )
 
+// signInSessionName names the session every plugin's sign-in page shows in.
+// One profile serves them all: signing in to a service once, Google's for
+// example, counts for every plugin that goes through it, and a sign-in
+// outlives its window and the app.
+const signInSessionName = "sign-in"
+
+// signInSession is that session. NewSession answers the same one for the same
+// name, keeping its data on disk from one run of the app to the next.
+func signInSession() *mygo.Session { return mygo.NewSession(signInSessionName) }
+
 // webSignIn shows a plugin's sign-in page in a window of its own, over the
-// one its dialog is in, in a session of its own: it sees none of the
-// listener's other sign-ins, and is forgotten once the window closes. It answers the Cookie
-// header of the address the plugin asked for once the cookies it named are
-// all there, and closes the window. Closing it first is giving up.
+// one its dialog is in, in the shared sign-in profile: a service signed in
+// to there is signed in to for the plugins that use it, and stays signed in.
+// It answers the Cookie header of the address the plugin asked for once the
+// cookies it named are all there, and closes the window. Closing it first is
+// giving up.
 func (a *app) webSignIn(o plugin.WebSignIn) (string, error) {
 	// Asked on the main thread: on Linux the first asking loads WebKitGTK and
 	// makes its default web context, and WebKit then takes the thread that did
@@ -38,7 +49,12 @@ func (a *app) webSignIn(o plugin.WebSignIn) (string, error) {
 	if !available {
 		return "", errors.New(T("This computer can't show the page to sign in on"))
 	}
-	session := mygo.NewEphemeralSession()
+	session := signInSession()
+	// Signed in already, by this plugin or another one's page: answer without
+	// a window.
+	if header, ok := signInCookies(session, o); ok {
+		return header, nil
+	}
 	over := a.win
 	if a.signInOver != nil {
 		if w := a.signInOver.Load(); w != nil {
@@ -80,17 +96,23 @@ func (a *app) webSignIn(o plugin.WebSignIn) (string, error) {
 			win.Close()
 			return "", errors.New(T("Signing in took too long. Try again."))
 		case <-tick.C:
-			cookies, err := session.Cookies.List(mygo.CookieFilter{URL: o.CookiesOf})
-			if err != nil {
-				log.Printf("sign-in page of %s: %v", o.Plugin, err)
-				continue
-			}
-			if header, ok := cookieHeader(cookies, o.Until); ok {
+			if header, ok := signInCookies(session, o); ok {
 				win.Close()
 				return header, nil
 			}
 		}
 	}
+}
+
+// signInCookies is the Cookie header of the sign-in session's cookies for the
+// address the plugin asked for, once those it named are all there.
+func signInCookies(session *mygo.Session, o plugin.WebSignIn) (string, bool) {
+	cookies, err := session.Cookies.List(mygo.CookieFilter{URL: o.CookiesOf})
+	if err != nil {
+		log.Printf("sign-in page of %s: %v", o.Plugin, err)
+		return "", false
+	}
+	return cookieHeader(cookies, o.Until)
 }
 
 // cookieHeader is the Cookie header that sends cookies, once those named in
