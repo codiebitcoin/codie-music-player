@@ -466,7 +466,7 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 			if a.codiePairing.challenge == "" {
 				ui.TextInput(c.Key("codie-addr"), &a.codiePairing.addr).Placeholder(T("Device IP (port 8081 by default)")).Width(240).FontSize(13)
 				if ui.Button(c.Key("codie-pair"), T("Start pairing")).Disabled(a.codiePairing.busy || a.codiePairing.addr == "").Clicked() {
-					go a.codiePair(a.codiePairing.addr)
+					a.codiePair(a.codiePairing.addr)
 				}
 			} else {
 				ui.TextInput(c.Key("codie-code"), &a.codiePairing.code).Placeholder(T("6-digit code")).Width(140).FontSize(13).AutoFocus()
@@ -475,6 +475,11 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 				}
 			}
 		})
+		if a.codiePairing.challenge == "" {
+			block(T("Scan for devices"), func() {
+				ui.Column(c).Padding(8, 16).Gap(8).Children(func() { a.codieScanView(c, p) })
+			})
+		}
 	})
 
 	add("cache", T("Cache"), iconDatabase, func(row settingsRow, block settingsBlock) {

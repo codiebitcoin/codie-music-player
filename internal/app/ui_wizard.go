@@ -107,17 +107,20 @@ func (a *app) codieWizardView(c *ui.Context, p palette) {
 		switch w.step {
 		case 0: // bind the device
 			ui.Text(c, T("Bind the Codie device")).FontSize(17).FontWeight(700)
-			ui.Text(c, T("Enter the device's IP (the port is 8081 by default; a full IP:port works too). After Start pairing, the device's screen shows a 6-digit code.")).
+			ui.Text(c, T("Scan for the device on this network, or type its IP (the port is 8081 by default; a full IP:port works too). Once pairing starts, the device's screen shows a 6-digit code.")).
 				FontSize(13).TextColor(p.muted).LineHeight(1.5)
 			if a.settings.Codie != nil {
 				ui.Text(c, Tf("Paired: %s", a.settings.Codie.Addr)).FontSize(13).TextColor(p.accent)
 			}
 			ui.Text(c, T(a.codiePairing.status)).FontSize(12.5).TextColor(p.muted)
 			if a.codiePairing.challenge == "" {
+				// Finding the device comes first: its address is typed only when
+				// the sweep doesn't see it.
+				ui.Box(c).Gap(8).Children(func() { a.codieScanView(c, p) })
 				ui.Row(c).Gap(8).Children(func() {
 					ui.TextInput(c.Key("wiz-addr"), &a.codiePairing.addr).Placeholder(T("Device IP")).Width(230).FontSize(13)
 					if ui.Button(c.Key("wiz-pair"), T("Start pairing")).Disabled(a.codiePairing.busy || a.codiePairing.addr == "").Clicked() {
-						go a.codiePair(a.codiePairing.addr)
+						a.codiePair(a.codiePairing.addr)
 					}
 				})
 			} else {

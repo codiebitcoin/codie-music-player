@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/egoist/mygo"
@@ -16,6 +17,21 @@ type codiePairState struct {
 	challenge string // the pairing challenge, once the device shows its code
 	busy      bool   // a pair step is on its way
 	status    string // the last thing that happened, in English, for the row to say
+
+	scanning bool              // the network is being swept for devices
+	scanned  bool              // a sweep has ended, so that finding none can be said
+	found    []codieout.Device // what the last sweep found
+	scanErr  string            // why the last sweep couldn't look, in English
+}
+
+// requestPairing asks the device at addr to show its code; tests replace it.
+var requestPairing = func(addr string) (string, error) {
+	return codieout.New(&codieout.Creds{Addr: addr}).RequestPairing()
+}
+
+// scanCodieDevices looks for codie devices on the network; tests replace it.
+var scanCodieDevices = func() ([]codieout.Device, error) {
+	return codieout.Scan(context.Background())
 }
 
 // codieClient answers the paired device's client, or nil.
@@ -48,19 +64,46 @@ func (a *app) codiePair(addr string) {
 	a.codiePairing.busy, a.codiePairing.status = true, ""
 	a.codiePairing.addr = addr
 	a.redraw()
-	c := codieout.New(&codieout.Creds{Addr: addr})
-	challenge, err := c.RequestPairing()
-	mygo.RunOnMain(func() {
-		a.codiePairing.busy = false
-		if err != nil {
-			a.codiePairing.status = err.Error()
-			a.codiePairing.challenge = ""
-		} else {
-			a.codiePairing.challenge = challenge
-			a.codiePairing.status = "Enter the 6-digit code shown on the device's screen"
-		}
-		a.redraw()
-	})
+	go func() {
+		challenge, err := requestPairing(addr)
+		a.post(func() {
+			a.codiePairing.busy = false
+			if err != nil {
+				a.codiePairing.status = err.Error()
+				a.codiePairing.challenge = ""
+			} else {
+				a.codiePairing.challenge = challenge
+				a.codiePairing.status = "Enter the 6-digit code shown on the device's screen"
+			}
+		})
+	}()
+}
+
+// codieScan sweeps the network for codie devices, to pair one without knowing
+// its address, and lists what it found under the pairing.
+func (a *app) codieScan() {
+	s := &a.codiePairing
+	s.scanning, s.scanned, s.found, s.scanErr = true, false, nil, ""
+	a.redraw()
+	go func() {
+		found, err := scanCodieDevices()
+		a.post(func() {
+			// Asked for again meanwhile, as the setup guide does: whatever
+			// it asks now is what's shown.
+			s := &a.codiePairing
+			s.scanning, s.scanned = false, true
+			if err != nil {
+				s.found, s.scanErr = nil, err.Error()
+				return
+			}
+			s.found, s.scanErr = found, ""
+		})
+	}()
+}
+
+// codiePick starts pairing a device the sweep found.
+func (a *app) codiePick(d codieout.Device) {
+	a.codiePair(d.Addr)
 }
 
 // codieConfirm trades the code the listener read on the device for a client
@@ -84,6 +127,7 @@ func (a *app) codieConfirm(code string) {
 			a.settings.CodieOn = true
 			a.codieStatus = "Paired, checking…"
 			a.codiePairing.status = "Paired to " + creds.Addr
+			a.codiePairing.found, a.codiePairing.scanned = nil, false // no longer choosing
 			a.changed()
 			go a.codieTest()
 		}
