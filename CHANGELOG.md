@@ -2,6 +2,12 @@
 
 All notable changes to MyGo Music are written down here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.1.31] - 2026-11-25
+
+### Fixed
+
+- A paired codie device that comes back at another address is found again on the network, instead of failing with a network error. A device that reconnects is often given a new address by DHCP, and the pair is its secret, not its address: when the paired address stops answering, the app sweeps the network, asks each device with the pair's own credential, and keeps the one that takes it.
+
 ## [0.1.30] - 2026-11-25
 
 ### Added

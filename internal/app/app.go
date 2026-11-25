@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"slices"
 	"sync/atomic"
+	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -79,6 +80,8 @@ type app struct {
 	installer        pluginInstaller // installing and updating plugins
 	codiePairing     codiePairState  // where the codie settings section is
 	codieState       string          // how the paired device is: online, no-card or offline, for the sidebar's row
+	codieRefinding   bool            // a sweep is looking for the paired device at a new address
+	codieRefoundAt   time.Time       // when that was last tried
 	codieStatus      string          // how the paired device is, fetched async, in English
 	codieStatusAsked bool            // the one-shot auto refresh of that
 	codieSongs       []CodieSong     // the device card's songs, for the long-press menu

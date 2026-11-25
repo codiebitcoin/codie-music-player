@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -40,6 +41,11 @@ var scanCodieDevices = func() ([]codieout.Device, error) {
 // sidebar's row: the device answers in a moment on the same network.
 const codiePoll = 30 * time.Second
 
+// codieRefindEvery is how often a paired device that stopped answering is
+// looked for at a new address: a sweep of the network takes a few seconds,
+// and an address that moved won't move again the same minute.
+const codieRefindEvery = time.Minute
+
 // codieProbeNow asks the paired device how it is, off the main thread, and
 // keeps the answer for the sidebar's row. Main thread only.
 func (a *app) codieProbeNow() {
@@ -57,9 +63,41 @@ func (a *app) codieProbeNow() {
 			if st.IsLoaded {
 				state = "online"
 			}
+		} else {
+			// An address that stops answering is often a device that
+			// reconnected and was given another one; look for it again.
+			a.post(a.codieRefind)
 		}
 		a.post(func() {
 			a.codieState = state
+		})
+	}()
+}
+
+// codieRefind looks for the paired device at a new address, for one that
+// stopped answering: a device that reconnects to the network often gets
+// another address, and the pair is its secret, so it's found again without
+// pairing anew. Main thread only.
+func (a *app) codieRefind() {
+	if a.codieRefinding || a.settings.Codie == nil {
+		return
+	}
+	if !a.codieRefoundAt.IsZero() && time.Since(a.codieRefoundAt) < codieRefindEvery {
+		return
+	}
+	creds := *a.settings.Codie
+	a.codieRefinding, a.codieRefoundAt = true, time.Now()
+	go func() {
+		addr, ok := codieout.FindPaired(context.Background(), &creds)
+		a.post(func() {
+			a.codieRefinding = false
+			if !ok || a.settings.Codie == nil || a.settings.Codie.Addr == addr {
+				return
+			}
+			log.Printf("codie: found the paired device at %s", addr)
+			a.settings.Codie.Addr = addr
+			a.changed()
+			a.codieProbeNow()
 		})
 	}()
 }
