@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"github.com/egoist/mygo"
 
 	"mygo-music/internal/codieout"
@@ -13,7 +15,7 @@ type codiePairState struct {
 	code      string // the pairing code being typed
 	challenge string // the pairing challenge, once the device shows its code
 	busy      bool   // a pair step is on its way
-	status    string // the last thing that happened, for the row to say
+	status    string // the last thing that happened, in English, for the row to say
 }
 
 // codieClient answers the paired device's client, or nil.
@@ -55,7 +57,7 @@ func (a *app) codiePair(addr string) {
 			a.codiePairing.challenge = ""
 		} else {
 			a.codiePairing.challenge = challenge
-			a.codiePairing.status = T("Enter the 6-digit code shown on the device's screen")
+			a.codiePairing.status = "Enter the 6-digit code shown on the device's screen"
 		}
 		a.redraw()
 	})
@@ -68,7 +70,7 @@ func (a *app) codieConfirm(code string) {
 	if challenge == "" {
 		return
 	}
-	a.codiePairing.busy, a.codiePairing.status = true, T("Confirming…")
+	a.codiePairing.busy, a.codiePairing.status = true, "Confirming…"
 	a.redraw()
 	c := codieout.New(&codieout.Creds{Addr: a.codiePairing.addr})
 	creds, err := c.ConfirmPairing(challenge, code)
@@ -80,8 +82,8 @@ func (a *app) codieConfirm(code string) {
 		} else {
 			a.settings.Codie = creds
 			a.settings.CodieOn = true
-			a.codieStatus = T("Paired, checking…")
-			a.codiePairing.status = Tf("Paired to %s", creds.Addr)
+			a.codieStatus = "Paired, checking…"
+			a.codiePairing.status = "Paired to " + creds.Addr
 			a.changed()
 			go a.codieTest()
 		}
@@ -95,15 +97,15 @@ func (a *app) codieClear() {
 	if c == nil {
 		return
 	}
-	a.codiePairing.busy, a.codiePairing.status = true, T("Clearing device songs…")
+	a.codiePairing.busy, a.codiePairing.status = true, "Clearing device songs…"
 	a.redraw()
 	n, err := c.ClearCardUploads()
 	mygo.RunOnMain(func() {
 		a.codiePairing.busy = false
 		if err != nil {
-			a.codieStatus = Tf("Clearing stopped after %d deleted: %v", n, err)
+			a.codieStatus = fmt.Sprintf("Clearing stopped after %d deleted: %v", n, err)
 		} else {
-			a.codieStatus = Tf("Cleared %d device songs", n)
+			a.codieStatus = fmt.Sprintf("Cleared %d device songs", n)
 		}
 		a.redraw()
 	})
@@ -143,16 +145,16 @@ func (a *app) codieTest() {
 	var status string
 	switch {
 	case c == nil:
-		status = T("Not paired")
+		status = "Not paired"
 	default:
 		st, err := c.MusicStorage()
 		switch {
 		case err != nil:
-			status = Tf("Offline: %s", err.Error())
+			status = "Offline: " + err.Error()
 		case !st.IsLoaded:
-			status = T("Online · TF card not ready")
+			status = "Online · TF card not ready"
 		default:
-			status = T("Online · TF card ready")
+			status = "Online · TF card ready"
 		}
 	}
 	mygo.RunOnMain(func() {

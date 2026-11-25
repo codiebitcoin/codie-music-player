@@ -77,7 +77,7 @@ type app struct {
 	captions         captionState    // the episode playing's captions, and the model they take
 	installer        pluginInstaller // installing and updating plugins
 	codiePairing     codiePairState  // where the codie settings section is
-	codieStatus      string          // how the paired device is, fetched async
+		codieStatus      string          // how the paired device is, fetched async, in English
 	codieStatusAsked bool            // the one-shot auto refresh of that
 	codieSongs       []CodieSong     // the device card's songs, for the long-press menu
 	codieSongsErr    string

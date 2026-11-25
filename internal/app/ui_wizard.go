@@ -112,7 +112,7 @@ func (a *app) codieWizardView(c *ui.Context, p palette) {
 			if a.settings.Codie != nil {
 				ui.Text(c, Tf("Paired: %s", a.settings.Codie.Addr)).FontSize(13).TextColor(p.accent)
 			}
-			ui.Text(c, a.codiePairing.status).FontSize(12.5).TextColor(p.muted)
+			ui.Text(c, T(a.codiePairing.status)).FontSize(12.5).TextColor(p.muted)
 			if a.codiePairing.challenge == "" {
 				ui.Row(c).Gap(8).Children(func() {
 					ui.TextInput(c.Key("wiz-addr"), &a.codiePairing.addr).Placeholder(T("Device IP")).Width(230).FontSize(13)

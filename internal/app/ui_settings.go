@@ -443,9 +443,9 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 			}
 			status := a.codieStatus
 			if status == "" {
-				status = T("Checking…")
+				status = "Checking…"
 			}
-			row(T("Paired device"), s.Codie.Addr+" · "+status, func() {
+			row(T("Paired device"), s.Codie.Addr+" · "+T(status), func() {
 				if ui.Button(c.Key("codie-test"), T("Test")).Disabled(a.codiePairing.busy).Clicked() {
 					go a.codieTest()
 				}
@@ -462,7 +462,7 @@ func (a *app) settingsSections(c *ui.Context, p palette) []settingsSection {
 				a.startWizard()
 			}
 		})
-		row(T("Pair a new device"), a.codiePairing.status, func() {
+		row(T("Pair a new device"), T(a.codiePairing.status), func() {
 			if a.codiePairing.challenge == "" {
 				ui.TextInput(c.Key("codie-addr"), &a.codiePairing.addr).Placeholder(T("Device IP (port 8081 by default)")).Width(240).FontSize(13)
 				if ui.Button(c.Key("codie-pair"), T("Start pairing")).Disabled(a.codiePairing.busy || a.codiePairing.addr == "").Clicked() {
