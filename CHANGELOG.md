@@ -2,6 +2,18 @@
 
 All notable changes to MyGo Music are written down here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.1.30] - 2026-11-25
+
+### Added
+
+- Pair a codie device by scanning the network for one: the app asks every address on this machine's networks on port 8081, lists the devices that answer, and pairs the one picked.
+- An HTTP proxy setting, for a network that won't reach the sources' servers: what ffmpeg and yt-dlp fetch goes through it, as `http://127.0.0.1:7897`. Empty, everything goes direct.
+- The sidebar says how the paired codie device is — online, without its card, or offline — asked when the window takes focus and every half minute.
+
+### Changed
+
+- Every plugin's web page signs in on one profile now: a sign-in on one source's page is known to the others, and a source already signed in opens without the window.
+
 ## [0.1.29] - 2026-11-25
 
 ### Added
