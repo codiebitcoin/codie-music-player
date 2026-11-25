@@ -1814,7 +1814,15 @@ const installed = {};
 
 async function program(name, versionFlag) {
   if (installed[name]) return installed[name];
-  const places = [name, `/opt/homebrew/bin/${name}`, `/usr/local/bin/${name}`];
+  // The app's own copy comes first: resources/bin, which ships per platform.
+  // Windows finds the program of a path without its .exe.
+  const home = (typeof host.resourcesDir === "function" && host.resourcesDir()) || "";
+  const places = [
+    home && `${home}/bin/${name}`,
+    name,
+    `/opt/homebrew/bin/${name}`,
+    `/usr/local/bin/${name}`,
+  ].filter(Boolean);
   for (const path of places) {
     try {
       const proc = host.spawn(path, [versionFlag]);

@@ -1,23 +1,46 @@
 # Codie Music Player
 
-GitHub：https://github.com/codiebitcoin/codie-music-player
+A native desktop music player for the CODE27 family. It plays the music on this computer, and songs from the sources it ships with, in the app or on a paired codie device. The interface is in English, 简体中文 and 日本語.
 
-[mygo-music](https://music.egoist.dev/)（by egoist）的 fork：完整的原生音乐播放器，
-四音源插件（网易云 / QQ 音乐 / Bilibili / Spotify），外加 **codie 输出** ——
-任何流媒体音源的歌曲都可以推到 codie 设备（TF 卡 + 音乐 API）播放。
+简体中文: [README.zh-CN.md](README.zh-CN.md) · 日本語: [README.ja.md](README.ja.md)
 
-## Fork 改动
+This is a fork of [mygo-music](https://github.com/egoist/mygo-music) by egoist. It is written in Go with [MyGo](https://mygo.egoist.dev), with a native interface and no WebView. AGPL-3.0, see [LICENSE](LICENSE).
 
-- `internal/codieout`：codie 设备客户端（LocalAuthGuard 签名、配对、TF 卡上传、
-  PLAY+queue，契约见 `docs/m0-auth-report.md`）+ `Sink`（把流媒体 Source 包装成
-  PlaybackRemote，复用 mygo-music 的 remote 播放引擎）
-- `internal/player`：`Player.Codie` 钩子 —— 流媒体源在 codie 开启时走 remote 通道
-- 设置新增 **Codie** 区块：开关、配对（6 位码 → client credential）、状态测试
-- `mygo.config.ts`：改名 Codie Music Player / com.codie.musicplayer，移除自动更新与签名
+## Sources
 
-使用：设置 → Codie → 配对设备（IP:端口 + 设备上的 6 位码）→ 打开「在 Codie 设备上播放」。
-设备侧需打开音乐页面并插好 TF 卡；音源会自动切到 LOCAL_TF。
+| Source | How | What it plays |
+|---|---|---|
+| This computer | Built in (`internal/local`) | Folders you add. MP3, FLAC, Ogg, ALAC, AAC and WAV, with their tags, covers and `.lrc` lyrics. |
+| NetEase Cloud Music | Plugin (`plugins/netease`) | Search, charts, daily picks, your playlists and liked songs once you sign in. |
+| QQ Music | Plugin (`plugins/qqmusic`) | Search and your library, signed in by scanning with WeChat. |
+| Bilibili | Plugin (`plugins/bilibili`) | The audio of videos: search, charts, favorites and timed subtitles as lyrics. |
+| YouTube Music | Plugin (`plugins/youtube-music`) | Home, charts, new releases, search, and your library once you sign in. |
+| Spotify | Plugin (`plugins/mygotify`) | Spotify's catalog and your library, with the audio played from YouTube Music. |
 
-## 原项目
+The first run installs the plugins the app ships. A plugin is an ordinary directory of JavaScript (`plugin.json` + `index.js`). Drop one in the app's plugins folder to add another source.
 
-AGPL-3.0，见 [LICENSE](LICENSE)。上游：https://github.com/egoist/mygo-music
+Bilibili, YouTube Music and Spotify play through ffmpeg and yt-dlp. Both ship inside the app, one copy for each platform, so nothing has to be installed first. yt-dlp still needs a JavaScript runtime (Deno, Node or Bun) for YouTube's challenges.
+
+## Play on a codie device
+
+1. Open Settings → Codie, fill in the device's address (`IP:port`) and the 6-digit code its screen shows.
+2. Turn on Play on the Codie device. Whatever you play is sent to the device's TF card and played there, and the device switches its source to that card.
+3. The device needs its music page open and a TF card in it, on the same network as this computer.
+4. A song already on the card plays at once, without uploading again. A song too large to upload in one go is split and played through.
+
+## Build
+
+```bash
+go test ./internal/...
+scripts/fetch-tools.sh darwin windows-amd64 linux-amd64 linux-arm64
+go tool mygo build          # the desktop app, from mygo.config.ts
+```
+
+`scripts/fetch-tools.sh` downloads the ffmpeg and yt-dlp each platform ships into `resources/<platform>/bin`. They are fetched at build time and are not part of the source. With no argument it fetches the copy for the machine it runs on.
+
+`go tool mygo build -platform darwin/arm64,windows/amd64,linux/amd64` builds every platform from one machine.
+
+## Notes
+
+- The plugins talk to third-party services through those services' own web interfaces. This project stores none of their music and redistributes none of it, and it isn't affiliated with NetEase, Tencent, Bilibili, Google or Spotify.
+- Those interfaces change without notice, so a source can stop working until its plugin is updated.

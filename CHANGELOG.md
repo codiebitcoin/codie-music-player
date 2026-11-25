@@ -2,11 +2,18 @@
 
 All notable changes to MyGo Music are written down here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.1.28] - 2026-11-25
+
+### Changed
+
+- The app is a music player again. The video window, the video plugin protocol and the huangguo source are gone; Bilibili and YouTube Music play songs only.
+- ffmpeg and yt-dlp ship with the app, one copy for each platform, so Bilibili, YouTube Music and Spotify play without installing them first.
+
 ## [0.1.27] - 2026-11-21
 
 ### Added
 
-- Video: bilibili, YouTube and huangguo videos play in a video window of the app. Sources answer video searches, item pages and streams through a new video plugin protocol; a demo plugin and a terminal probe come along.
+- Video: bilibili, YouTube and huangguo videos play in a video window of the app. Sources answer video searches, item pages and streams through a new video plugin protocol; a demo plugin and a terminal probe come along. Removed in 0.1.28.
 
 ### Fixed
 
@@ -263,6 +270,7 @@ All notable changes to MyGo Music are written down here. Versions follow [Semant
 
 The first release: a native music player that plays your local files and gets everything else from plugins.
 
+[0.1.28]: https://github.com/codiebitcoin/codie-music-player/compare/v0.1.27...v0.1.28
 [0.1.27]: https://github.com/codiebitcoin/codie-music-player/compare/v0.1.26...v0.1.27
 [0.1.26]: https://github.com/codiebitcoin/codie-music-player/compare/v0.1.25...v0.1.26
 [0.1.22]: https://github.com/egoist/mygo-music/compare/v0.1.21...v0.1.22

@@ -72,24 +72,17 @@ type app struct {
 	headers *headerPlugins // the plugins on, for the headers of their pictures
 	allLibs []*library     // every plugin, on or off; libs are those on
 
-	// The sources of videos, of the plugins on, and the window that shows
-	// them. A plugin of videos alone is none of libs.
-	videoLibs    []*videoLib
-	allVideoLibs []*videoLib
-	videoWin     *mygo.Window
-	video        videoState
-
 	wasBehind bool // the window wasn't at the front as last built
 
-	captions  captionState    // the episode playing's captions, and the model they take
-	installer pluginInstaller // installing and updating plugins
-	codiePairing codiePairState // where the codie settings section is
-	codieStatus      string // how the paired device is, fetched async
-	codieStatusAsked bool   // the one-shot auto refresh of that
-	codieSongs       []CodieSong // the device card's songs, for the long-press menu
+	captions         captionState    // the episode playing's captions, and the model they take
+	installer        pluginInstaller // installing and updating plugins
+	codiePairing     codiePairState  // where the codie settings section is
+	codieStatus      string          // how the paired device is, fetched async
+	codieStatusAsked bool            // the one-shot auto refresh of that
+	codieSongs       []CodieSong     // the device card's songs, for the long-press menu
 	codieSongsErr    string
 	codieSongsAsked  bool
-	wizard       wizardState    // the first-run guide, until it's done
+	wizard           wizardState // the first-run guide, until it's done
 	// links are the app's links opened before its window was made, macOS
 	// handing over the one it was started with first.
 	links []string
@@ -254,16 +247,12 @@ func (a *app) makeSources() {
 	a.headers = &headerPlugins{}
 	music.ImageHeaders = a.headers.image
 	for _, p := range a.plugins {
-		if p.VideoOnly() {
-			continue
-		}
 		lib := newLibrary(p)
 		if !slices.ContainsFunc(a.allLibs, func(l *library) bool { return l.id == lib.id }) {
 			a.allLibs = append(a.allLibs, lib)
 		}
 	}
 	a.enabledChanged()
-	a.makeVideoLibs()
 	a.library = a.libs[0]
 	if lib := a.libOf(a.settings.Source); lib != nil {
 		a.library = lib
@@ -295,7 +284,6 @@ func (a *app) enabledChanged() {
 		}
 		a.headers.set(on)
 	}
-	a.makeVideoLibs()
 }
 
 // setPluginEnabled turns a plugin on or off. Off, it stops, its pages go, and if
@@ -354,7 +342,6 @@ func Run(bundledPlugins fs.FS) error {
 		lyricAt:     -1,
 		queueAt:     -1,
 		cacheUsed:   -1,
-		video:       videoState{vol: 100},
 	}
 	a.useUpdater(i18n.Resolve(loadSettings().Language, systemLanguages()))
 	mygo.App.WhenReady(func() {

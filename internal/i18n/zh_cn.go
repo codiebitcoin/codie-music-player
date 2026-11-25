@@ -452,19 +452,4 @@ var zhCN = map[string]string{
 	"① Pair the device":     "① 绑定机器",
 	"② Sign in to a source": "② 登录音源",
 	"③ Try a song":          "③ 尝试播放",
-
-	// The video window.
-	"Videos":                                "视频",
-	"Videos…":                               "视频…",
-	"Search Videos":                         "搜索视频",
-	"Source":                                "视频源",
-	"Search above for what this source has": "在上方搜索这个源里的内容",
-	"No source of videos is on. Turn a plugin that plays videos on in the settings.": "没有开启视频源。请到设置里开启能播视频的插件。",
-	"Unavailable":                        "不可用",
-	"This video has no episodes to play": "这个视频没有可播放的剧集",
-	"Couldn't play this episode":         "无法播放这一集",
-	"Opening…":                           "打开中…",
-	"Try Again":                          "重试",
-	"This episode took too long to open. Try again.":                                       "这一集打开超时了，请重试。",
-	"This video plays through ffmpeg, which isn't installed. Install it, then play again.": "这个视频要装了 ffmpeg 才能播。安装后再试。",
 }

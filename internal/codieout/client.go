@@ -19,10 +19,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/egoist/mygo"
 
 	"mygo-music/internal/i18n"
 )
@@ -437,17 +440,9 @@ func (c *Client) UploadAudio(path, name string) ([]string, error) {
 // splitAudio cuts path into ceil(size/MaxUploadBytes) pieces of copy-coded
 // audio in a temp dir, answering their paths in order.
 func splitAudio(path, name string, size int64) ([]string, error) {
-	ffmpeg, err := exec.LookPath("ffmpeg")
-	if err != nil {
-		for _, p := range []string{"/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"} {
-			if _, e := os.Stat(p); e == nil {
-				ffmpeg, err = p, nil
-				break
-			}
-		}
-		if err != nil {
-			return nil, err
-		}
+	ffmpeg := findFFmpeg()
+	if ffmpeg == "" {
+		return nil, errors.New("ffmpeg")
 	}
 	out, err := os.MkdirTemp("", "cmp-split-*")
 	if err != nil {
@@ -719,4 +714,40 @@ func trunc(b []byte, n int) string {
 		return s[:n]
 	}
 	return s
+}
+
+// findFFmpeg finds ffmpeg: the one the app ships, then one on PATH, then the
+// usual places. A GUI app gets none of a shell's PATH.
+func findFFmpeg() string {
+	if p := bundledProgram("ffmpeg"); p != "" {
+		return p
+	}
+	if p, err := exec.LookPath("ffmpeg"); err == nil {
+		return p
+	}
+	for _, p := range []string{"/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"} {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+// bundledProgram is a program the app ships, bin/<name> of its resources, or
+// "" when this build ships none. Windows finds it without the .exe.
+func bundledProgram(name string) string {
+	dir, err := mygo.App.Path(mygo.PathResources)
+	if err != nil {
+		return ""
+	}
+	p := filepath.Join(dir, "bin", name)
+	if _, err := os.Stat(p); err == nil {
+		return p
+	}
+	if runtime.GOOS == "windows" {
+		if _, err := os.Stat(p + ".exe"); err == nil {
+			return p + ".exe"
+		}
+	}
+	return ""
 }

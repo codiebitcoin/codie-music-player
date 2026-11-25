@@ -1,8 +1,0 @@
-{
-  "id": "demo-video",
-  "name": "Demo Video",
-  "version": "1.0.0",
-  "kind": "video",
-  "main": "index.js",
-  "permissions": {}
-}
